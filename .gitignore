@@ -1,0 +1,30 @@
+node_modules/
+dist/
+release/
+*.log
+
+# Build artifacts
+guardian-portable.zip
+
+# Runtime-generated data (not checked in)
+data/students.json
+data/admin.json
+data/sessions.json
+data/remote-config.json
+
+# Generated documentation
+Guardian技术文档.docx
+~$*.docx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store

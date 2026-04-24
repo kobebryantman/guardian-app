@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guardian - 访问守卫</title>
+  <style>
+    :root {
+      --bg: #0f0f1a;
+      --bg2: #1a1a2e;
+      --bg3: #16213e;
+      --card: #1e2740;
+      --border: #2a3a5c;
+      --accent: #4f8ef7;
+      --accent2: #7c4dff;
+      --green: #00e676;
+      --red: #ff5252;
+      --yellow: #ffd740;
+      --text: #e8eaf6;
+      --text2: #8892b0;
+      --danger: #ff1744;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 顶部标题栏 */
+    .header {
+      background: linear-gradient(135deg, var(--bg2), var(--bg3));
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      -webkit-app-region: drag;
+    }
+    .header-logo {
+      font-size: 22px;
+    }
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-subtitle {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+    .header-spacer { flex: 1; }
+    .guard-toggle {
+      -webkit-app-region: no-drag;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 8px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .guard-toggle:hover { border-color: var(--accent); }
+    .guard-toggle.active { border-color: var(--green); background: rgba(0,230,118,0.1); }
+    .guard-toggle.active .status-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .guard-toggle .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: all 0.3s;
+    }
+
+    /* 主布局 */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* 左侧导航 */
+    .sidebar {
+      width: 180px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 0;
+      color: var(--text2);
+      font-size: 14px;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: rgba(79,142,247,0.1); color: var(--text); }
+    .nav-item.active {
+      background: rgba(79,142,247,0.15);
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+    .nav-icon { font-size: 18px; }
+
+    /* 主内容区 */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .content::-webkit-scrollbar { width: 6px; }
+    .content::-webkit-scrollbar-track { background: transparent; }
+    .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* 页面 */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* 卡片 */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 仪表盘统计 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 16px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat-value.danger { color: var(--red); }
+    .stat-value.safe { color: var(--green); }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 6px;
+    }
+
+    /* 进程列表 */
+    .process-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .process-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--bg3);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      transition: border-color 0.2s;
+    }
+    .process-item.blocked { border-color: var(--red); background: rgba(255,82,82,0.07); }
+    .process-item:hover { border-color: var(--accent); }
+    .process-status {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .process-name { font-weight: 600; min-width: 160px; }
+    .process-title { color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .process-pid { color: var(--text2); font-size: 11px; min-width: 60px; text-align: right; }
+    .btn-kill {
+      padding: 3px 10px;
+      background: rgba(255,82,82,0.2);
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.15s;
+    }
+    .btn-kill:hover { background: var(--red); color: #fff; }
+
+    /* 违规日志 */
+    .violation-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .violation-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: rgba(255,82,82,0.08);
+      border-left: 3px solid var(--red);
+      border-radius: 0 6px 6px 0;
+      font-size: 12px;
+    }
+    .violation-time { color: var(--yellow); min-width: 70px; }
+    .violation-name { font-weight: 600; color: var(--red); min-width: 150px; }
+    .violation-title { color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .violation-action {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      background: rgba(255,23,68,0.2);
+      color: var(--danger);
+      border: 1px solid rgba(255,23,68,0.4);
+    }
+    .violation-action.detected {
+      background: rgba(255,215,64,0.15);
+      color: var(--yellow);
+      border-color: rgba(255,215,64,0.4);
+    }
+
+    /* 白名单编辑 */
+    .whitelist-section { margin-bottom: 16px; }
+    .whitelist-section h3 {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .tag-input-area {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-height: 60px;
+      cursor: text;
+    }
+    .tag {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(79,142,247,0.15);
+      border: 1px solid rgba(79,142,247,0.4);
+      border-radius: 14px;
+      font-size: 12px;
+      color: var(--accent);
+    }
+    .tag.browser-tag {
+      background: rgba(124,77,255,0.15);
+      border-color: rgba(124,77,255,0.4);
+      color: var(--accent2);
+    }
+    .tag-remove {
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 14px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .tag-remove:hover { color: var(--red); }
+    .add-item-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .add-input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .add-input:focus { border-color: var(--accent); }
+    .text-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: #0f1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    .text-input:focus { border-color: var(--accent); }
+    .btn {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #3a7fe8; }
+    .btn-success {
+      background: rgba(0,230,118,0.15);
+      border: 1px solid var(--green);
+      color: var(--green);
+    }
+    .btn-success:hover { background: var(--green); color: #0f0f1a; }
+    .btn-danger {
+      background: rgba(255,82,82,0.15);
+      border: 1px solid var(--red);
+      color: var(--red);
+    }
+    .btn-danger:hover { background: var(--red); color: #fff; }
+
+    /* 设置 */
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-label { font-size: 14px; }
+    .settings-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .toggle-switch {
+      width: 44px; height: 24px;
+      background: var(--border);
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-switch.on { background: var(--accent); }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      background: white;
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle-switch.on::after { transform: translateX(20px); }
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .range-input {
+      width: 140px;
+      accent-color: var(--accent);
+    }
+    .range-value {
+      font-size: 13px;
+      color: var(--accent);
+      min-width: 50px;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text2);
+      font-size: 14px;
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+    /* 实时扫描动画 */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .scanning { animation: pulse 1.5s infinite; color: var(--accent); }
+
+    /* 通知提示 */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+      z-index: 9999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: var(--green); color: var(--green); }
+    .toast.error { border-color: var(--red); color: var(--red); }
+    .toast.warn { border-color: var(--yellow); color: var(--yellow); }
+  </style>
+</head>
+<body>
+
+<!-- 顶部标题栏 -->
+<div class="header">
+  <span class="header-logo">🛡️</span>
+  <div>
+    <div class="header-title">Guardian 访问守卫</div>
+    <div class="header-subtitle">进程与网页白名单控制系统</div>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="guard-toggle" id="guardToggle" onclick="toggleGuard()">
+    <div class="status-dot"></div>
+    <span id="guardToggleText">守卫未启动</span>
+  </div>
+</div>
+
+<!-- 主布局 -->
+<div class="layout">
+
+  <!-- 左侧导航 -->
+  <div class="sidebar">
+    <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard', this)">
+      <span class="nav-icon">📊</span> 仪表盘
+    </div>
+    <div class="nav-item" data-page="processes" onclick="switchPage('processes', this)">
+      <span class="nav-icon">⚙️</span> 进程监控
+    </div>
+    <div class="nav-item" data-page="violations" onclick="switchPage('violations', this)">
+      <span class="nav-icon">⚠️</span> 违规日志
+    </div>
+    <div class="nav-item" data-page="whitelist" onclick="switchPage('whitelist', this)">
+      <span class="nav-icon">📋</span> 白名单
+    </div>
+    <div class="nav-item" data-page="settings" onclick="switchPage('settings', this)">
+      <span class="nav-icon">🔧</span> 设置
+    </div>
+    <div class="nav-item" data-page="remote" onclick="switchPage('remote', this)">
+      <span class="nav-icon" id="remoteNavIcon">🌐</span> <span id="remoteNavLabel">远程管控</span>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <div class="content">
+
+    <!-- 仪表盘 -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-status">⏸</div>
+          <div class="stat-label">守卫状态</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value safe" id="stat-processes">0</div>
+          <div class="stat-label">有窗口进程</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value danger" id="stat-blocked">0</div>
+          <div class="stat-label">拦截记录</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-whitelist">0</div>
+          <div class="stat-label">白名单条目</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>⚡</span> 实时进程状态
+          <span id="scan-indicator" style="font-size:12px;color:var(--text2);margin-left:auto">等待启动...</span>
+        </div>
+        <div class="process-list" id="dashboard-process-list">
+          <div class="empty-state"><div class="empty-icon">🔍    </div>
+
+    <!-- 远程管控 -->
+    <div class="page" id="page-remote" style="display:none">
+      <div class="card">
+        <div class="card-title"><span>🌐</span> 远程管控设置</div>
+
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">🔌 启用远程管控（子机模式）</div>
+            <div class="settings-desc">开启后自动连接到管控服务器，教师可远程管理本机</div>
+          </div>
+          <div class="toggle-switch" id="toggle-remoteEnabled" onclick="toggleRemoteEnabled(this)"></div>
+        </div>
+
+        <div class="settings-row" id="remoteServerRow" style="display:none">
+          <div>
+            <div class="settings-label">🖥️ 管控服务器地址</div>
+            <div class="settings-desc">填写教师机 IP 和端口，如 <code style="color:var(--accent)">ws://192.168.1.100:3847</code></div>
+          </div>
+        </div>
+        <input type="text" id="remoteServerUrl" class="text-input" placeholder="ws://教师机IP:3847" style="margin-bottom:10px;display:none">
+
+        <div class="settings-row" id="remoteBindRow" style="display:none">
+          <div>
+            <div class="settings-label">🪪 学生身份绑定</div>
+            <div class="settings-desc">输入教师分配给你的接入码，将本机绑定到对应学生名下</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px" id="remoteBindInputRow" style="display:none">
+          <input type="text" id="bindCode" class="text-input" placeholder="接入码（6位）" maxlength="8" style="flex:1">
+          <button class="btn btn-primary" onclick="doBindStudent()" id="bindBtn">绑定</button>
+        </div>
+        <div id="bindStatus" style="font-size:13px;padding:8px 12px;border-radius:6px;display:none"></div>
+
+        <div style="margin-top:12px" id="remoteStatusRow" style="display:none">
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">📡 连接状态</div>
+              <div class="settings-desc" id="remoteStatusText">正在连接...</div>
+            </div>
+            <span id="remoteStatusBadge" style="padding:4px 12px;border-radius:20px;font-size:12px;background:#64748b22;color:#64748b">检查中</span>
+          </div>
+        </div>
+
+        <div style="margin-top:16px" id="remoteSaveRow" style="display:none">
+          <button class="btn btn-success" onclick="saveRemoteSettings()">💾 保存并连接</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>💡</span> 使用说明</div>
+        <div style="font-size:13px;color:var(--text2);line-height:2">
+          <p>① <strong>教师端</strong>：在教师机上运行 <code>node server.js</code>，在浏览器打开 <code>http://localhost:3847</code> 管理所有子机</p>
+          <p>② <strong>子机端</strong>：在本界面启用远程管控，输入教师提供的服务器地址和接入码</p>
+          <p>③ <strong>接入码</strong>：由教师在管控端添加学生后生成，每位学生有唯一6位码</p>
+          <p>④ <strong>管控功能</strong>：教师可查看所有子机进程状态、远程开启/关闭守卫、强制结束进程、统一下发白名单</p>
+          <p style="color:var(--muted);margin-top:8px">⚠️ 关闭此页面后程序继续在后台运行，如需退出请右键托盘图标</p>
+        </div>
+      </div>
+
+      <div id="serverMsgBox" style="display:none;margin-top:12px">
+        <div class="card" style="border-color:var(--accent);background:#4f8ef722">
+          <div class="card-title"><span>📢</span> 管控消息 <span style="font-size:12px;color:var(--accent)">来自教师</span></div>
+          <div id="serverMsgText" style="font-size:14px;color:#fff;padding:8px 0"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>🚨</span> 最近违规（最新5条）
+          <span style="font-size:12px;color:var(--text2);margin-left:auto;cursor:pointer" onclick="switchPage('violations', document.querySelector('[data-page=violations]'))">查看全部 →</span>
+        </div>
+        <div class="violation-list" id="dashboard-violation-list">
+          <div class="empty-state"><div class="empty-icon">✅</div>暂无违规记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 进程监控 -->
+    <div class="page" id="page-processes">
+      <div class="card">
+        <div class="card-title">
+          <span>⚙️</span> 有窗口进程监控
+          <button class="btn btn-primary" style="margin-left:auto;padding:6px 14px;font-size:12px" onclick="refreshProcesses()">🔄 刷新</button>
+        </div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
+          仅显示拥有可见窗口的进程。绿色=白名单允许，红色=未在白名单中。
+        </p>
+        <div class="process-list" id="all-process-list">
+          <div class="empty-state"><div class="empty-icon">⚙️</div>点击刷新加载进程列表</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 违规日志 -->
+    <div class="page" id="page-violations">
+      <div class="card">
+        <div class="card-title">
+          <span>⚠️</span> 违规拦截日志
+          <button class="btn btn-danger" style="margin-left:auto;padding:6px 14px;font-size:12px" onclick="clearViolations()">🗑️ 清空</button>
+        </div>
+        <div class="violation-list" id="all-violation-list" style="max-height:500px">
+          <div class="empty-state"><div class="empty-icon">✅</div>暂无违规记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 白名单管理 -->
+    <div class="page" id="page-whitelist">
+      <div class="card">
+        <div class="card-title"><span>📋</span> 白名单管理</div>
+
+        <div class="whitelist-section">
+          <h3>✅ 允许的进程名 (exe)</h3>
+          <div class="tag-input-area" id="process-tags"></div>
+          <div class="add-item-row">
+            <input class="add-input" id="add-process-input" placeholder="输入进程名，如 notepad.exe" />
+            <button class="btn btn-primary" onclick="addProcessTag()">添加</button>
+          </div>
+        </div>
+
+        <div class="whitelist-section">
+          <h3>🌐 允许的浏览器进程 (可运行但URL受限)</h3>
+          <div class="tag-input-area" id="browser-tags"></div>
+          <div class="add-item-row">
+            <input class="add-input" id="add-browser-input" placeholder="输入浏览器进程名，如 chrome.exe" />
+            <button class="btn btn-primary" onclick="addBrowserTag()">添加</button>
+          </div>
+        </div>
+
+        <div class="whitelist-section">
+          <h3>🔗 允许访问的URL/域名</h3>
+          <div class="tag-input-area" id="url-tags"></div>
+          <div class="add-item-row">
+            <input class="add-input" id="add-url-input" placeholder="输入域名，如 baidu.com" />
+            <button class="btn btn-primary" onclick="addUrlTag()">添加</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-success" onclick="saveWhitelist()">💾 保存白名单</button>
+          <button class="btn" style="border:1px solid var(--border);color:var(--text2)" onclick="loadWhitelist()">↩️ 重新加载</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置 -->
+    <div class="page" id="page-settings">
+      <div class="card">
+        <div class="card-title"><span>🔧</span> 守卫设置</div>
+
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">⚡ 自动结束违规进程</div>
+            <div class="settings-desc">检测到不在白名单的有窗口进程后，自动关闭它</div>
+          </div>
+          <div class="toggle-switch" id="toggle-killUnknown" onclick="toggleSetting('killUnknown', this)"></div>
+        </div>
+
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">🔔 仅通知模式</div>
+            <div class="settings-desc">开启后只记录违规，不执行关闭操作（推荐初期使用）</div>
+          </div>
+          <div class="toggle-switch on" id="toggle-notifyOnly" onclick="toggleSetting('notifyOnly', this)"></div>
+        </div>
+
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">🗂️ 最小化到托盘</div>
+            <div class="settings-desc">关闭窗口时最小化到系统托盘，不退出程序</div>
+          </div>
+          <div class="toggle-switch on" id="toggle-minimizeToTray" onclick="toggleSetting('minimizeToTray', this)"></div>
+        </div>
+
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">⏱️ 检测间隔</div>
+            <div class="settings-desc">老旧电脑建议调大间隔（5000ms以上）</div>
+          </div>
+          <div class="range-row">
+            <input type="range" class="range-input" id="interval-slider"
+              min="1000" max="10000" step="500" value="3000"
+              oninput="updateIntervalDisplay(this.value)" />
+            <span class="range-value" id="interval-display">3000ms</span>
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <button class="btn btn-success" onclick="saveSettings()">💾 保存设置</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>ℹ️</span> 关于 Guardian</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.8">
+          Guardian 访问守卫 v1.0.0<br>
+          基于 Electron 构建，仅监控有可见窗口的进程，避免误杀系统进程。<br>
+          适用于老旧电脑，低资源占用模式下检测间隔可设置为5~10秒。<br>
+          <br>
+          <strong>工作原理：</strong><br>
+          • 通过 PowerShell 获取 MainWindowHandle ≠ 0 的进程（即有窗口的进程）<br>
+          • 对比白名单，发现不在列表中的进程进行记录/拦截<br>
+          • 浏览器进程允许运行，但可通过标题栏检测访问内容
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 提示Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ 全局状态 ============
+let guardActive = false;
+let whitelist = { processes: [], urls: [], browsers: [] };
+let config = {};
+let allProcesses = [];
+let allViolations = [];
+let pendingSettings = {};
+
+// ============ 初始化 ============
+async function init() {
+  whitelist = await window.guardian.getWhitelist();
+  config = await window.guardian.getConfig();
+  guardActive = await window.guardian.getGuardStatus();
+  allViolations = await window.guardian.getViolations();
+
+  updateGuardUI(guardActive);
+  renderWhitelistTags();
+  renderSettingsUI();
+  updateStats();
+  initRemoteUI();
+
+  // 监听主进程推送的事件
+  window.guardian.onGuardStatus((active) => {
+    guardActive = active;
+    updateGuardUI(active);
+  });
+
+  window.guardian.onViolationsUpdate((newViolations) => {
+    allViolations = [...newViolations, ...allViolations].slice(0, 100);
+    renderViolations();
+    updateStats();
+    if (newViolations.length > 0) {
+      showToast(`🚨 检测到 ${newViolations.length} 个违规进程！`, 'warn');
+    }
+  });
+
+  window.guardian.onProcessesUpdate((processes) => {
+    allProcesses = processes;
+    renderDashboardProcesses();
+    updateStats();
+  });
+
+  // 监听远程状态
+  window.guardian.onRemoteStatus((status) => {
+    updateRemoteStatusUI(status.connected);
+  });
+
+  window.guardian.onServerMessage((msg) => {
+    showServerMessage(msg);
+  });
+
+  window.guardian.onWhitelistUpdated((wl) => {
+    whitelist = wl;
+    renderWhitelistTags();
+    showToast('✅ 管控端已更新白名单', 'success');
+  });
+}
+
+// ============ 远程管控 UI ============
+let remoteConfig = {};
+
+async function initRemoteUI() {
+  remoteConfig = await window.guardian.getRemoteConfig();
+  const toggle = document.getElementById('toggle-remoteEnabled');
+  const serverRow = document.getElementById('remoteServerRow');
+  const serverInput = document.getElementById('remoteServerUrl');
+  const bindRow = document.getElementById('remoteBindRow');
+  const bindInputRow = document.getElementById('remoteBindInputRow');
+  const saveRow = document.getElementById('remoteSaveRow');
+  const statusRow = document.getElementById('remoteStatusRow');
+
+  if (remoteConfig.enabled) {
+    toggle.classList.add('on');
+    serverRow.style.display = 'flex';
+    serverInput.style.display = 'block';
+    serverInput.value = remoteConfig.serverUrl || '';
+    bindRow.style.display = 'flex';
+    bindInputRow.style.display = 'flex';
+    saveRow.style.display = 'block';
+    statusRow.style.display = 'flex';
+
+    if (remoteConfig.studentId && remoteConfig.studentName) {
+      showBindStatus(true, remoteConfig.studentName);
+    }
+  }
+}
+
+function toggleRemoteEnabled(el) {
+  el.classList.toggle('on');
+  const on = el.classList.contains('on');
+  document.getElementById('remoteServerRow').style.display = on ? 'flex' : 'none';
+  document.getElementById('remoteServerUrl').style.display = on ? 'block' : 'none';
+  document.getElementById('remoteBindRow').style.display = on ? 'flex' : 'none';
+  document.getElementById('remoteBindInputRow').style.display = on ? 'flex' : 'none';
+  document.getElementById('remoteSaveRow').style.display = on ? 'block' : 'none';
+  document.getElementById('remoteStatusRow').style.display = on ? 'flex' : 'none';
+
+  // 更新导航图标
+  document.getElementById('remoteNavIcon').textContent = on ? '🌐' : '🔗';
+}
+
+async function saveRemoteSettings() {
+  const enabled = document.getElementById('toggle-remoteEnabled').classList.contains('on');
+  const serverUrl = document.getElementById('remoteServerUrl').value.trim();
+  if (enabled && !serverUrl) { showToast('请填写服务器地址', 'warn'); return; }
+  await window.guardian.saveRemoteConfig({ enabled, serverUrl });
+  showToast('✅ 远程设置已保存', 'success');
+}
+
+async function doBindStudent() {
+  const code = document.getElementById('bindCode').value.trim().toUpperCase();
+  if (!code) { showToast('请输入接入码', 'warn'); return; }
+  const btn = document.getElementById('bindBtn');
+  btn.textContent = '绑定中...'; btn.disabled = true;
+  const r = await window.guardian.bindStudent(code);
+  btn.disabled = false; btn.textContent = '绑定';
+  if (r.ok) {
+    showBindStatus(true, r.studentName);
+    showToast(`✅ 已绑定：${r.studentName}`, 'success');
+  } else {
+    showBindStatus(false, r.msg || '绑定失败');
+    showToast(r.msg || '绑定失败', 'warn');
+  }
+}
+
+function showBindStatus(success, text) {
+  const el = document.getElementById('bindStatus');
+  el.style.display = 'block';
+  el.textContent = (success ? '✅ 已绑定：' : '❌ ') + text;
+  el.style.background = success ? '#22c55e22' : '#ef444422';
+  el.style.color = success ? 'var(--green)' : 'var(--red)';
+  if (success) {
+    document.getElementById('remoteNavLabel').textContent = '🌐 已绑定';
+  }
+}
+
+function updateRemoteStatusUI(connected) {
+  const badge = document.getElementById('remoteStatusBadge');
+  const text = document.getElementById('remoteStatusText');
+  if (connected) {
+    badge.textContent = '🟢 已连接';
+    badge.style.background = '#22c55e22';
+    badge.style.color = 'var(--green)';
+    text.textContent = '已成功连接到管控服务器';
+  } else {
+    badge.textContent = '🔴 断开';
+    badge.style.background = '#ef444422';
+    badge.style.color = 'var(--red)';
+    text.textContent = '与管控服务器连接断开，正在重连...';
+  }
+}
+
+function showServerMessage(msg) {
+  const box = document.getElementById('serverMsgBox');
+  const text = document.getElementById('serverMsgText');
+  box.style.display = 'block';
+  text.textContent = msg;
+  showToast('📢 收到管控消息：' + msg.slice(0, 30), 'info');
+}
+
+// ============ 切换守卫 ============
+async function toggleGuard() {
+  guardActive = await window.guardian.toggleGuard();
+  updateGuardUI(guardActive);
+  showToast(guardActive ? '✅ 守卫已启动' : '⏸ 守卫已停止', guardActive ? 'success' : 'warn');
+  if (guardActive) {
+    document.getElementById('scan-indicator').className = 'scanning';
+    document.getElementById('scan-indicator').textContent = '实时扫描中...';
+  } else {
+    document.getElementById('scan-indicator').textContent = '已停止';
+    document.getElementById('scan-indicator').className = '';
+  }
+}
+
+function updateGuardUI(active) {
+  const toggle = document.getElementById('guardToggle');
+  const text = document.getElementById('guardToggleText');
+  const statusStat = document.getElementById('stat-status');
+  if (active) {
+    toggle.classList.add('active');
+    text.textContent = '守卫运行中';
+    statusStat.textContent = '🟢';
+  } else {
+    toggle.classList.remove('active');
+    text.textContent = '守卫未启动';
+    statusStat.textContent = '⏸';
+  }
+}
+
+// ============ 进程渲染 ============
+function renderProcessItem(proc, showKill = false) {
+  const allowed = proc.allowed !== false;
+  const div = document.createElement('div');
+  div.className = `process-item ${allowed ? '' : 'blocked'}`;
+  div.innerHTML = `
+    <div class="process-status" style="background:${allowed ? 'var(--green)' : 'var(--red)'}"></div>
+    <div class="process-name">${proc.name || proc.Name || '未知'}</div>
+    <div class="process-title">${proc.title || proc.MainWindowTitle || '-'}</div>
+    <div class="process-pid">PID: ${proc.pid || proc.Id}</div>
+    ${showKill && !allowed ? `<button class="btn-kill" onclick="killProc(${proc.pid || proc.Id})">结束</button>` : ''}
+  `;
+  return div;
+}
+
+function renderDashboardProcesses() {
+  const el = document.getElementById('dashboard-process-list');
+  if (!allProcesses.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>启动守卫后开始监控</div>';
+    return;
+  }
+  el.innerHTML = '';
+  allProcesses.slice(0, 15).forEach(p => el.appendChild(renderProcessItem(p, false)));
+}
+
+async function refreshProcesses() {
+  const processes = await window.guardian.getProcesses();
+  allProcesses = processes.map(p => ({ ...p, allowed: checkAllowed(p.name) }));
+  const el = document.getElementById('all-process-list');
+  if (!allProcesses.length) {
+    el.innerHTML = '<div class="empty-state">没有检测到有窗口的进程</div>';
+    return;
+  }
+  el.innerHTML = '';
+  allProcesses.forEach(p => el.appendChild(renderProcessItem(p, true)));
+  showToast(`已刷新，共 ${allProcesses.length} 个有窗口进程`, 'success');
+}
+
+function checkAllowed(name) {
+  const n = (name || '').toLowerCase();
+  const sys = ['explorer.exe','dwm.exe','sihost.exe','taskhostw.exe','shellexperiencehost.exe'];
+  if (sys.includes(n)) return true;
+  return whitelist.processes.some(p => p.toLowerCase() === n) ||
+         whitelist.browsers.some(b => b.toLowerCase() === n);
+}
+
+async function killProc(pid) {
+  const ok = await window.guardian.killProcess(pid);
+  if (ok) { showToast('✅ 进程已结束', 'success'); refreshProcesses(); }
+  else showToast('❌ 结束进程失败', 'error');
+}
+
+// ============ 违规日志 ============
+function renderViolations() {
+  renderViolationList('dashboard-violation-list', allViolations.slice(0, 5));
+  renderViolationList('all-violation-list', allViolations);
+}
+
+function renderViolationList(id, list) {
+  const el = document.getElementById(id);
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>暂无违规记录</div>';
+    return;
+  }
+  el.innerHTML = list.map(v => `
+    <div class="violation-item">
+      <span class="violation-time">${v.time || '-'}</span>
+      <span class="violation-name">${v.name}</span>
+      <span class="violation-title">${v.title || '(无标题)'}</span>
+      <span class="violation-action ${v.action === 'detected' ? 'detected' : ''}">${v.action === 'killed' ? '已结束' : '已记录'}</span>
+    </div>
+  `).join('');
+}
+
+async function clearViolations() {
+  await window.guardian.clearViolations();
+  allViolations = [];
+  renderViolations();
+  updateStats();
+  showToast('✅ 日志已清空', 'success');
+}
+
+// ============ 统计更新 ============
+function updateStats() {
+  document.getElementById('stat-processes').textContent = allProcesses.length;
+  document.getElementById('stat-blocked').textContent = allViolations.length;
+  const total = whitelist.processes.length + whitelist.urls.length + whitelist.browsers.length;
+  document.getElementById('stat-whitelist').textContent = total;
+}
+
+// ============ 白名单标签渲染 ============
+function renderWhitelistTags() {
+  renderTags('process-tags', whitelist.processes, 'processes', '');
+  renderTags('browser-tags', whitelist.browsers, 'browsers', 'browser-tag');
+  renderTags('url-tags', whitelist.urls, 'urls', '');
+  updateStats();
+}
+
+function renderTags(containerId, items, key, tagClass) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = items.map((item, i) => `
+    <div class="tag ${tagClass}">
+      ${item}
+      <span class="tag-remove" onclick="removeTag('${key}', ${i})">×</span>
+    </div>
+  `).join('');
+}
+
+function removeTag(key, index) {
+  whitelist[key].splice(index, 1);
+  renderWhitelistTags();
+}
+
+function addProcessTag() {
+  const val = document.getElementById('add-process-input').value.trim();
+  if (!val) return;
+  const name = val.endsWith('.exe') ? val : val + '.exe';
+  if (!whitelist.processes.includes(name)) whitelist.processes.push(name);
+  document.getElementById('add-process-input').value = '';
+  renderWhitelistTags();
+}
+
+function addBrowserTag() {
+  const val = document.getElementById('add-browser-input').value.trim();
+  if (!val) return;
+  const name = val.endsWith('.exe') ? val : val + '.exe';
+  if (!whitelist.browsers.includes(name)) whitelist.browsers.push(name);
+  document.getElementById('add-browser-input').value = '';
+  renderWhitelistTags();
+}
+
+function addUrlTag() {
+  const val = document.getElementById('add-url-input').value.trim();
+  if (!val) return;
+  if (!whitelist.urls.includes(val)) whitelist.urls.push(val);
+  document.getElementById('add-url-input').value = '';
+  renderWhitelistTags();
+}
+
+async function saveWhitelist() {
+  await window.guardian.saveWhitelist(whitelist);
+  showToast('✅ 白名单已保存', 'success');
+}
+
+async function loadWhitelist() {
+  whitelist = await window.guardian.getWhitelist();
+  renderWhitelistTags();
+  showToast('↩️ 已重新加载', 'success');
+}
+
+// ============ 设置UI ============
+function renderSettingsUI() {
+  setToggle('toggle-killUnknown', config.killUnknown);
+  setToggle('toggle-notifyOnly', config.notifyOnly);
+  setToggle('toggle-minimizeToTray', config.minimizeToTray);
+  document.getElementById('interval-slider').value = config.checkInterval || 3000;
+  updateIntervalDisplay(config.checkInterval || 3000);
+}
+
+function setToggle(id, val) {
+  const el = document.getElementById(id);
+  if (val) el.classList.add('on'); else el.classList.remove('on');
+}
+
+function toggleSetting(key, el) {
+  const isOn = el.classList.toggle('on');
+  pendingSettings[key] = isOn;
+}
+
+function updateIntervalDisplay(val) {
+  document.getElementById('interval-display').textContent = val + 'ms';
+  pendingSettings.checkInterval = parseInt(val);
+}
+
+async function saveSettings() {
+  await window.guardian.saveConfig(pendingSettings);
+  config = { ...config, ...pendingSettings };
+  pendingSettings = {};
+  showToast('✅ 设置已保存', 'success');
+}
+
+// ============ 页面切换 ============
+function switchPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  // 切换到对应页面时自动刷新
+  if (name === 'processes') refreshProcesses();
+  if (name === 'violations') renderViolations();
+}
+
+// ============ Toast通知 ============
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => { el.className = 'toast'; }, 3000);
+}
+
+// ============ 回车快捷键 ============
+document.getElementById('add-process-input').addEventListener('keydown', e => { if(e.key==='Enter') addProcessTag(); });
+document.getElementById('add-browser-input').addEventListener('keydown', e => { if(e.key==='Enter') addBrowserTag(); });
+document.getElementById('add-url-input').addEventListener('keydown', e => { if(e.key==='Enter') addUrlTag(); });
+
+// 启动
+init();
+</script>
+</body>
+</html>

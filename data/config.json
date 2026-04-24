@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "checkInterval": 3000,
+  "killUnknown": false,
+  "notifyOnly": true,
+  "startWithWindows": false,
+  "minimizeToTray": true
+}
