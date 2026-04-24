@@ -1,214 +1,103 @@
-# Guardian 访问守卫 - 完整技术方案
+# Guardian 访问守卫
 
-## 一、项目定位
+机房考试场景下的进程管控系统。
 
-面向**算力较低的老旧电脑**，通过 Electron 构建一个本地部署的进程白名单守卫程序。
-核心目标：**只允许白名单内的软件运行，拦截非白名单程序（尤其是非授权网页浏览）**。
+**学生端** (Electron) 定时扫描有窗口进程 → 白名单比对 → 记录或结束违规进程。**管控服务器** (Express + WebSocket) 管理学生身份、下发远程指令、聚合在线状态。**教师端** (浏览器 + Electron 桌面) 实时查看所有子机状态、开关守卫、下发白名单。
 
-**远程管控**：支持一台教师机管理整个机房的子机，学生以姓名+接入码绑定，教师可实时查看所有子机状态、远程开关守卫、统一下发白名单。
-
----
-
-## 二、核心设计思路（来自对话分析）
-
-| 需求 | 实现方案 |
-|------|---------|
-| 不直接扫所有进程（误判系统进程）| 只检测 `MainWindowHandle ≠ 0` 的进程（带窗口的） |
-| 白名单机制 | 维护进程名白名单，不在列表则记录/拦截 |
-| 浏览器限制 | 浏览器进程本身允许运行，通过窗口标题检测访问内容 |
-| 低算力适配 | 检测间隔可调（默认3s，老旧电脑可设5-10s） |
-| 直接阻断 | 开启"自动结束"模式后，检测到违规进程立即 taskkill |
-| 远程管控 | WebSocket 服务器 + 客户端架构，教师端 HTTP+WS，子机 WS 直连 |
+系统分三层：学生端的**守卫引擎** (PowerShell 进程扫描 + 白名单引擎) 通过 **WS 通道** 与服务器通信；服务器通过 **REST API** 暴露管理能力给教师端；教师端通过 **WS 订阅** 接收实时推送。
 
 ---
 
-## 三、系统架构
+## 目录结构
 
 ```
 guardian-app/
-├── src/
-│   ├── main.js          # Electron主进程（核心逻辑）
-│   ├── preload.js       # 安全桥梁（IPC通信）
-│   └── renderer/
-│       ├── index.html   # 子机管理界面
-├── server.js            # 教师端管控服务器（HTTP + WebSocket）
-├── remote-client.js     # 子机端 WebSocket 客户端模块
-├── public/
-│   └── control.html     # 教师端管控界面
-├── data/
-│   ├── whitelist.json   # 白名单
-│   ├── config.json      # 配置
-│   ├── remote-config.json  # 远程配置
-│   ├── students.json    # 学生列表（教师端）
-│   └── admin.json       # 管理员账号（教师端）
+├── client/                         # 学生端 Electron 应用
+│   ├── src/
+│   │   ├── main.js                 # 主进程，守卫循环，IPC handle
+│   │   ├── preload.js              # contextBridge — 安全桥梁
+│   │   ├── remote-client.js        # WebSocket 客户端模块
+│   │   └── renderer/
+│   │       ├── index.html          # 学生机本地界面 (4 个 Tab)
+│   │       └── icon.png            # 应用图标
+│   ├── data/
+│   │   ├── whitelist.json          # 进程/浏览器/URL 三级白名单
+│   │   └── config.json             # 守卫参数
+│   ├── tools/
+│   │   └── build-package.js        # 手动打包脚本
+│   └── package.json                # client 依赖
+│
+├── server/                         # 管控服务器
+│   ├── src/
+│   │   ├── server.js               # 入口：创建 HTTP 服务
+│   │   └── app.js                  # Express：挂载中间件 + 路由
+│   ├── router/
+│   │   ├── auth.js                 # POST /api/admin/login
+│   │   ├── students.js             # CRUD /api/students
+│   │   ├── clients.js              # GET /api/clients + 远程管控
+│   │   ├── broadcast.js            # POST /api/broadcast
+│   │   └── bind.js                 # POST /api/student/bind
+│   ├── service/
+│   │   ├── state.js                # 共享状态 (students[], clients Map)
+│   │   └── ws-handler.js           # WebSocket 消息处理
+│   ├── utils/
+│   │   ├── storage.js              # JSON 文件读写
+│   │   └── auth.js                 # Token + requireAuth
+│   ├── assets/
+│   │   └── control.html            # 教师端浏览器 UI
+│   ├── data/
+│   │   ├── admin.json              # 管理员账号
+│   │   └── students.json           # 学生记录
+│   ├── desktop/
+│   │   ├── main.js                 # 教师端桌面程序 (Electron)
+│   │   └── icon.png
+│   └── package.json                # server 依赖
+│
+├── docs/
+│   ├── protocol.md                 # 通信协议规范
+│   ├── config.md                   # 房间配置设计
+│   ├── tech-stack.md               # 技术栈方案
+│   └── communication.md           # 通信架构总览
+│
+├── CLAUDE.md
+├── README.md
+└── .gitignore
 ```
 
 ---
 
-## 四、远程管控使用流程
+## 开发
 
-### 教师端（一次性设置）
 ```bash
-cd guardian-app
-node server.js
-# 浏览器打开 http://localhost:3847
-# 首次登录：admin / guardian2026
-```
-1. 登录后点击「添加学生」→ 输入姓名/班级/座位号 → 保存后会生成6位**接入码**
-2. 将接入码告诉对应学生
+# 学生端 (Electron)
+cd client
+npm install
+npm start                    # 启动 Electron 应用
+npm run dev                  # 启动 + 开发者工具
 
-### 子机端（每台电脑）
-1. 启动 Guardian 主程序
-2. 点击底部导航「**远程管控**」
-3. 开启"子机模式" → 填写服务器地址（`ws://教师机IP:3847`）
-4. 点击「保存并连接」
-5. 输入**接入码**绑定身份
+# 管控服务器
+cd server
+npm install
+npm start                    # 启动 HTTP+WS 服务器 → http://localhost:3847
+# 默认账号: admin / guardian2026
 
-### 教师端（上课时）
-- 查看所有子机的实时在线状态
-- 一键开启/关闭所有子机的守卫
-- 统一下发新的白名单配置
-- 接收每台子机的违规记录
-
----
-
-## 五、架构说明
-
-```
-┌──────────────┐        HTTP / WebSocket        ┌──────────────────────┐
-│   教师浏览器   │ ←─────────────────────────────→ │   server.js (Node.js)  │
-│ 管控界面(3847) │        REST API               │  - HTTP Server         │
-└──────────────┘                                │  - WebSocket Server    │
-                                                │  - 学生注册/认证       │
-                                                │  - 数据存储(JSON)       │
-                                                └──────────┬─────────────┘
-                                                           │ WS 直连
-                                          ┌────────────────┼────────────────┐
-                                          ▼                ▼                ▼
-                                    ┌─────────┐      ┌─────────┐      ┌─────────┐
-                                    │ 子机01  │      │ 子机02  │      │ 子机03  │
-                                    │ Guardian│      │ Guardian│      │ Guardian│
-                                    │ (Electron)     │ (Electron)     │ (Electron)     │
-                                    └─────────┘      └─────────┘      └─────────┘
-                                    学生: 张三      学生: 李四       学生: 王五
-```
-│       └── icon.png     # 应用图标
-├── data/
-│   ├── whitelist.json   # 白名单配置（持久化）
-│   └── config.json      # 运行配置（持久化）
-└── package.json
+# 教师端 (桌面版，在服务器启动后另开终端)
+npm run desktop              # Electron 窗口加载管理界面
 ```
 
----
+## 启动流程
 
-## 四、功能模块详解
+1. 在服务器上运行 `cd server && npm start`
+2. 教师浏览器打开 `http://server-ip:3847`，用 `admin / guardian2026` 登录
+3. 「添加学生」→ 输入姓名/班级/座位号 → 生成 6 位接入码
+4. 学生在 `client/` 启动 Guardian → 远程管控 Tab → 输入服务器地址 + 接入码绑定
+5. 教师在管控界面查看子机状态、远程开关守卫、下发白名单
 
-### 4.1 进程监控引擎
 
-```javascript
-// 核心：PowerShell 获取有窗口进程
-Get-Process | Where-Object {$_.MainWindowHandle -ne 0} 
-           | Select-Object Name,Id,MainWindowTitle 
-           | ConvertTo-Json
-```
+## docs/ 说明
 
-**为什么这样做？**
-- Windows 系统有大量后台进程（svchost、lsass等），直接扫所有进程会大量误判
-- `MainWindowHandle ≠ 0` 精准筛选"用户可见软件"，通常只有10-30个
-- 对老旧电脑友好，避免无意义的进程遍历
-
-### 4.2 白名单三级结构
-
-```json
-{
-  "processes": ["notepad.exe", "calc.exe", ...],   // 完全允许的进程
-  "browsers": ["chrome.exe", "msedge.exe", ...],  // 浏览器（URL受限）
-  "urls": ["baidu.com", "qq.com", ...]             // 允许访问的域名
-}
-```
-
-### 4.3 浏览器URL检测
-
-**方案A（当前样品）：窗口标题推断**
-- Chrome/Edge 标题格式：`页面标题 - Google Chrome`
-- 可匹配标题中是否含违禁内容关键词
-- 零额外资源占用
-
-**方案B（进阶）：UI Automation / 注入**
-- 通过 Windows UI Automation 读取地址栏真实URL
-- 精确但有一定CPU占用
-- 适合需要严格限制的场景
-
-### 4.4 守卫模式
-
-| 模式 | 行为 |
-|------|------|
-| 仅通知 | 检测到违规进程 → 记录到日志，弹出警告 |
-| 自动拦截 | 检测到违规进程 → 立即 `taskkill /F /PID xxx` |
-
----
-
-## 五、运行方式
-
-### 开发模式启动
-```bash
-cd guardian-app
-npm start
-# 或
-node_modules\.bin\electron .
-```
-
-### 打包为exe（需安装electron-builder）
-```bash
-npm install electron-builder --save-dev
-npx electron-builder --win --x64
-```
-
----
-
-## 六、使用步骤
-
-1. **首次启动** → 系统加载默认白名单（包含常用系统程序）
-2. **配置白名单** → 在"白名单"页面添加允许运行的程序
-3. **调整设置** → 老旧电脑建议将检测间隔调至 5000ms
-4. **启动守卫** → 点击顶部"守卫未启动"按钮开启
-5. **查看日志** → 在"违规日志"页面查看被检测的进程
-
----
-
-## 七、性能优化（低算力适配）
-
-| 优化点 | 具体措施 |
-|--------|---------|
-| 检测间隔 | 默认3s，可调至10s（老旧电脑） |
-| 进程范围 | 只扫有窗口进程（减少90%无效扫描） |
-| 系统进程内置白名单 | 20+系统关键进程硬编码跳过，不走JSON查询 |
-| UI渲染 | 纯CSS+原生JS，无React/Vue框架，内存极低 |
-| 日志限制 | 最多保留100条违规记录，防止内存泄漏 |
-
----
-
-## 八、后续进阶功能（路线图）
-
-- [ ] **UI Automation URL检测**：精确获取浏览器地址栏URL
-- [ ] **时间段控制**：设定允许上网的时间窗口
-- [ ] **密码保护**：防止用户自行关闭守卫
-- [ ] **家长控制模式**：隐藏守卫窗口，只留托盘图标
-- [ ] **开机自启**：注册表/快捷方式实现开机自动启动
-- [ ] **网络层拦截**：通过hosts文件/代理拦截非白名单域名
-- [ ] **USB设备管控**：禁止插入未授权U盘
-
----
-
-## 九、技术栈
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Electron | ^35.x | 跨平台桌面框架 |
-| Node.js | v24.x | 主进程运行时 |
-| PowerShell | 内置 | 进程信息获取 |
-| 原生HTML/CSS/JS | - | 轻量级UI，无框架依赖 |
-
----
-
-*Guardian v1.0.0 - 样品版*
+`docs/` 目录包含后续重构的设计方案，目前尚未实现：
+- `protocol.md` — 通信协议规范（重构目标）
+- `config.md` — 房间配置 + 白名单类型设计（重构目标）
+- `tech-stack.md` — 技术栈方案 + 扩容路径（重构目标）
+- `communication.md` — 通信架构总览（重构目标）

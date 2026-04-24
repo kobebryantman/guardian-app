@@ -1,29 +1,18 @@
 {
-  "name": "guardian-app",
+  "name": "guardian-client",
   "version": "1.0.0",
-  "description": "Guardian 访问守卫 - 机房网页访问管控",
+  "private": true,
+  "description": "Guardian 学生端 - Electron 访问守卫",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "server": "node server.js",
     "build": "electron-builder --win --dir"
   },
-  "keywords": [
-    "electron",
-    "guardian",
-    "白名单",
-    "机房管控"
-  ],
-  "author": "Guardian",
-  "license": "ISC",
   "dependencies": {
-    "better-sqlite3": "^11.9.1",
-    "express": "^5.2.1",
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "docx": "^9.6.1",
     "electron": "^35.2.1",
     "electron-builder": "^26.0.0"
   },
@@ -36,9 +25,6 @@
     },
     "files": [
       "src/**/*",
-      "server.js",
-      "remote-client.js",
-      "public/**/*",
       "data/**/*",
       "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
@@ -48,18 +34,14 @@
       {
         "from": "data",
         "to": "data",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ],
     "win": {
       "target": [
         {
           "target": "dir",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "icon": "src/renderer/icon.png"

@@ -21,7 +21,7 @@ let remote = null;
 let remoteConfig = { enabled: false, serverUrl: '', studentId: '', studentName: '', bindCode: '' };
 
 try {
-  remote = require('../remote-client');
+  remote = require('./remote-client');
 } catch(e) {
   console.warn('[Remote] 远程模块加载失败:', e.message);
 }

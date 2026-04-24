@@ -3,18 +3,17 @@ dist/
 release/
 *.log
 
-# Build artifacts
-guardian-portable.zip
-
 # Runtime-generated data (not checked in)
-data/students.json
-data/admin.json
-data/sessions.json
-data/remote-config.json
+server/data/students.json
+server/data/sessions.json
+client/data/remote-config.json
 
 # Generated documentation
 Guardian技术文档.docx
 ~$*.docx
+
+# Build artifacts
+guardian-portable.zip
 
 # IDE
 .vscode/
