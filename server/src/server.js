@@ -10,7 +10,7 @@ accountService.init();
 const server = http.createServer(app);
 setupWebSocket(server);
 
-server.listen(PORT, 1024, () => {
+server.listen(PORT, 8192, () => {
   console.log(`Guardian server listening on http://localhost:${PORT}`);
   console.log(`WebSocket endpoint: ws://localhost:${PORT}/guardian-ws`);
   console.log('Default admin: admin / guardian2026');
