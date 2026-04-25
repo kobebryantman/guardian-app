@@ -547,7 +547,7 @@ async function main() {
   require('../server/service/account/account-service').init();
   const httpServer = http.createServer(require('../server/src/app'));
   require('../server/service/gateway/ws-gateway').setupWebSocket(httpServer);
-  await new Promise(r => httpServer.listen(3847, 1024, () => { PORT = 3847; r(); }));
+  await new Promise(r => httpServer.listen(9999, 1024, () => { PORT = 3847; r(); }));
   console.log(`${GREEN}✓${RESET} 服务端启动 on :${PORT}  |  PID ${process.pid}\n`);
 
   while (!isStopping) {

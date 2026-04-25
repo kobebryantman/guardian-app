@@ -22,8 +22,17 @@ function setupWebSocket(server) {
   server.on('upgrade', limiter.handleUpgrade);
 
   wss.on('connection', async (ws, req) => {
-    const ip = String(req.socket.remoteAddress || '').replace('::ffff:', '');
-    const client = await stateService.createClient(ws, ip);
+    let ip = ''
+    let client = null
+
+    try {
+      ip = String(req.socket.remoteAddress || '').replace('::ffff:', '');
+      client = await stateService.createClient(ws, ip);
+    } catch (error) {
+      console.log('client create err');
+      console.log(error);
+      
+    }
 
     ws.send(JSON.stringify({ type: 'welcome', clientId: client.clientId }));
 
@@ -38,15 +47,16 @@ function setupWebSocket(server) {
       let msg;
       try {
         msg = JSON.parse(raw.toString());
+        await stateService.touchClient(client.clientId);
       } catch (_) {
         return;
       }
 
-      await stateService.touchClient(client.clientId);
 
       switch (msg.type) {
         case 'bind': {
-          const joinCode = msg.roomCode || msg.joinCode;
+          try {
+            const joinCode = msg.roomCode || msg.joinCode;
           const room = await stateService.findRoomByJoinCode(joinCode);
           if (!room) {
             ws.send(JSON.stringify({ type: 'bind-ack', ok: false, msg: '房间码无效' }));
@@ -72,6 +82,11 @@ function setupWebSocket(server) {
             roomId: room.id,
             roomName: room.roomName
           }));
+          } catch (error) {
+            console.log('bind err');
+            console.log(error);
+            
+          }
           break;
         }
 
@@ -90,13 +105,23 @@ function setupWebSocket(server) {
     });
 
     ws.on('close', async () => {
-      clearTimeout(bindTimeout);
+      try {
+        clearTimeout(bindTimeout);
       await stateService.deleteClient(client.clientId);
+      } catch (error) {
+        console.log('close err');
+        console.log(error);
+      }
     });
 
     ws.on('error', async () => {
-      clearTimeout(bindTimeout);
-      await stateService.deleteClient(client.clientId);
+      try {
+        clearTimeout(bindTimeout);
+        await stateService.deleteClient(client.clientId);
+      } catch (error) {
+        console.log('ws on error');
+        console.log(error);
+      }
     });
   });
 
