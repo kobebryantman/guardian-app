@@ -1,29 +1,23 @@
-/**
- * Express 应用 — 挂载中间件和路由
- */
 const express = require('express');
 const path = require('path');
-const { ensureAdmin } = require('../utils/auth');
 
-const authRouter = require('../router/auth');
-const studentsRouter = require('../router/students');
-const clientsRouter = require('../router/clients');
-const broadcastRouter = require('../router/broadcast');
-const bindRouter = require('../router/bind');
-
-ensureAdmin();
+const adminRouter = require('../router/admin');
+const teacherRouter = require('../router/teacher');
+const roomsRouter = require('../router/rooms');
+const studentRouter = require('../router/student');
 
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'assets')));
+app.use('/docs/spec', express.static(path.join(__dirname, '..', '..', 'docs')));
 
 app.get('/', (req, res) => res.redirect('/control.html'));
+app.get('/docs', (req, res) => res.redirect('/docs/index.html'));
 
-app.use('/api/admin', authRouter);
-app.use('/api/students', studentsRouter);
-app.use('/api/clients', clientsRouter);
-app.use('/api/broadcast', broadcastRouter);
-app.use('/api/student', bindRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/teacher', teacherRouter);
+app.use('/api/rooms', roomsRouter);
+app.use('/api/student', studentRouter);
 
 module.exports = app;

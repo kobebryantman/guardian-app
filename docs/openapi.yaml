@@ -1,0 +1,1284 @@
+openapi: 3.0.3
+info:
+  title: Guardian Server API
+  version: 1.0.0
+  description: |
+    Guardian 后端 REST API 文档。
+    当前实现为“接口优先 + 内存态占位”，不包含数据库持久化。
+    WebSocket 协议见 `docs/asyncapi.yaml`。
+externalDocs:
+  description: Guardian WebSocket 协议（AsyncAPI）
+  url: ./asyncapi.yaml
+servers:
+  - url: http://{host}:3847
+    variables:
+      host:
+        default: localhost
+tags:
+  - name: Admin
+  - name: Teacher
+  - name: Rooms
+  - name: RoomStudents
+  - name: RoomClients
+  - name: Student
+paths:
+  /api/admin/login:
+    post:
+      tags: [Admin]
+      summary: 管理员登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminLoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminLoginResponse'
+        '401':
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/teachers:
+    get:
+      tags: [Admin]
+      summary: 获取教师列表
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, teachers]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  teachers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Teacher'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Admin]
+      summary: 创建教师
+      security:
+        - XTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeacherCreateRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, teacher]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  teacher:
+                    $ref: '#/components/schemas/Teacher'
+        '400':
+          description: 参数错误或工号重复
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/teachers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TeacherId'
+    get:
+      tags: [Admin]
+      summary: 获取教师详情
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, teacher]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  teacher:
+                    $ref: '#/components/schemas/Teacher'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Admin]
+      summary: 更新教师
+      security:
+        - XTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeacherUpdateRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, teacher]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  teacher:
+                    $ref: '#/components/schemas/Teacher'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Admin]
+      summary: 删除教师
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '400':
+          description: 教师名下有房间，无法删除
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/rooms:
+    get:
+      tags: [Admin]
+      summary: 获取全平台房间列表
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, rooms]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  rooms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminRoomSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/rooms/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RoomId'
+    get:
+      tags: [Admin]
+      summary: 获取任意房间详情（含客户端列表）
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, room]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  room:
+                    allOf:
+                      - $ref: '#/components/schemas/Room'
+                      - type: object
+                        required: [clients]
+                        properties:
+                          clients:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ClientInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Admin]
+      summary: 删除任意房间
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '400':
+          description: 房间中仍有在线子机，无法删除
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/teacher/login:
+    post:
+      tags: [Teacher]
+      summary: 教师登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeacherLoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherLoginResponse'
+        '401':
+          description: 工号或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/teacher/password:
+    put:
+      tags: [Teacher]
+      summary: 修改当前教师密码
+      security:
+        - XTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeacherPasswordRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms:
+    get:
+      tags: [Rooms]
+      summary: 获取当前教师的房间列表
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, rooms]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  rooms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TeacherRoomSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Rooms]
+      summary: 创建房间
+      security:
+        - XTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoomCreateRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, room]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  room:
+                    $ref: '#/components/schemas/Room'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/rooms/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RoomId'
+    get:
+      tags: [Rooms]
+      summary: 获取房间详情（含客户端列表）
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, room]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  room:
+                    allOf:
+                      - $ref: '#/components/schemas/Room'
+                      - type: object
+                        required: [clients]
+                        properties:
+                          clients:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ClientInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Rooms]
+      summary: 更新房间（局部）
+      security:
+        - XTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoomUpdateRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, room]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  room:
+                    $ref: '#/components/schemas/Room'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Rooms]
+      summary: 删除房间
+      security:
+        - XTokenAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '400':
+          description: 房间中仍有在线子机，无法删除
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms/{id}/start:
+    post:
+      tags: [Rooms]
+      summary: 启动考试（向房间在线子机发送 toggle-guard=true）
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms/{id}/stop:
+    post:
+      tags: [Rooms]
+      summary: 停止考试（向房间在线子机发送 toggle-guard=false）
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms/{id}/broadcast:
+    post:
+      tags: [Rooms]
+      summary: 广播消息到房间在线子机
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentResponse'
+        '400':
+          description: 消息为空
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms/{id}/students:
+    get:
+      tags: [RoomStudents]
+      summary: 获取房间学生列表
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, students]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  students:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Student'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [RoomStudents]
+      summary: 添加房间学生
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Student'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, student]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  student:
+                    $ref: '#/components/schemas/Student'
+        '400':
+          description: 参数错误或学生已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms/{id}/students/{studentId}:
+    delete:
+      tags: [RoomStudents]
+      summary: 删除房间学生
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+        - $ref: '#/components/parameters/StudentId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms/{id}/clients:
+    get:
+      tags: [RoomClients]
+      summary: 获取房间客户端列表
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, clients]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  clients:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClientInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/rooms/{id}/clients/{cid}/toggle-guard:
+    post:
+      tags: [RoomClients]
+      summary: 开关子机守卫
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 子机不在线或不属于该房间
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/rooms/{id}/clients/{cid}/kill:
+    post:
+      tags: [RoomClients]
+      summary: 结束子机进程
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pid]
+              properties:
+                pid:
+                  type: integer
+                  format: int32
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 子机不在线或不属于该房间
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/rooms/{id}/clients/{cid}/update-whitelist:
+    post:
+      tags: [RoomClients]
+      summary: 下发白名单到子机
+      security:
+        - XTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoomId'
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [whitelist]
+              properties:
+                whitelist:
+                  $ref: '#/components/schemas/RoomWhitelist'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkOnly'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 子机不在线或不属于该房间
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/student/bind:
+    post:
+      tags: [Student]
+      summary: 学生通过接入码绑定房间
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentBindRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentBindResponse'
+        '400':
+          description: 缺少接入码或学号
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 无效接入码或学号不在房间注册列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    XTokenAuth:
+      type: apiKey
+      in: header
+      name: x-token
+
+  parameters:
+    RoomId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    TeacherId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    StudentId:
+      name: studentId
+      in: path
+      required: true
+      schema:
+        type: string
+    ClientId:
+      name: cid
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: 未登录或 token 无效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: 无权限
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    OkOnly:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+
+    ErrorResponse:
+      type: object
+      required: [ok, msg]
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        msg:
+          type: string
+
+    SentResponse:
+      type: object
+      required: [ok, sent]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        sent:
+          type: integer
+          format: int32
+
+    AdminLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AdminLoginResponse:
+      type: object
+      required: [ok, token, role, username]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        token:
+          type: string
+        role:
+          type: string
+          enum: [admin]
+        username:
+          type: string
+
+    Teacher:
+      type: object
+      required: [id, staffId, name, createdAt]
+      properties:
+        id:
+          type: string
+        staffId:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TeacherCreateRequest:
+      type: object
+      required: [staffId, name, password]
+      properties:
+        staffId:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+
+    TeacherUpdateRequest:
+      type: object
+      properties:
+        staffId:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+
+    TeacherLoginRequest:
+      type: object
+      required: [staffId, password]
+      properties:
+        staffId:
+          type: string
+        password:
+          type: string
+
+    TeacherLoginResponse:
+      type: object
+      required: [ok, token, teacherId, staffId, name]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        token:
+          type: string
+        teacherId:
+          type: string
+        staffId:
+          type: string
+        name:
+          type: string
+
+    TeacherPasswordRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+        newPassword:
+          type: string
+
+    ProcessEntry:
+      type: object
+      required: [name, enabled]
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+
+    BrowserEntry:
+      type: object
+      required: [name, enabled]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+
+    UrlRule:
+      type: object
+      required: [pattern, type]
+      properties:
+        pattern:
+          type: string
+        type:
+          type: string
+          enum: [allow, deny]
+        description:
+          type: string
+
+    GuardConfig:
+      type: object
+      required: [checkInterval, notifyOnly, autoStartGuard]
+      properties:
+        checkInterval:
+          type: integer
+        notifyOnly:
+          type: boolean
+        autoStartGuard:
+          type: boolean
+
+    ScheduleConfig:
+      type: object
+      required: [autoMode, gracePeriod, allowLateJoin]
+      properties:
+        autoMode:
+          type: boolean
+        gracePeriod:
+          type: integer
+        allowLateJoin:
+          type: boolean
+
+    ViolationsConfig:
+      type: object
+      required: [maxAllowed]
+      properties:
+        maxAllowed:
+          type: integer
+
+    RoomWhitelist:
+      type: object
+      required: [processes, browsers, urls]
+      properties:
+        processes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessEntry'
+        browsers:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrowserEntry'
+        urls:
+          type: array
+          items:
+            $ref: '#/components/schemas/UrlRule'
+
+    Student:
+      type: object
+      required: [studentId, name]
+      properties:
+        studentId:
+          type: string
+        name:
+          type: string
+
+    ViolationEntry:
+      type: object
+      properties:
+        pid:
+          type: integer
+        name:
+          type: string
+        title:
+          type: string
+        time:
+          type: string
+        action:
+          type: string
+
+    Room:
+      type: object
+      required:
+        - id
+        - roomName
+        - joinCode
+        - teacherId
+        - createdAt
+        - guard
+        - schedule
+        - whitelist
+        - violations
+        - students
+      properties:
+        id:
+          type: string
+        roomName:
+          type: string
+        joinCode:
+          type: string
+        teacherId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        guard:
+          $ref: '#/components/schemas/GuardConfig'
+        schedule:
+          $ref: '#/components/schemas/ScheduleConfig'
+        whitelist:
+          $ref: '#/components/schemas/RoomWhitelist'
+        violations:
+          $ref: '#/components/schemas/ViolationsConfig'
+        students:
+          type: array
+          items:
+            $ref: '#/components/schemas/Student'
+
+    TeacherRoomSummary:
+      allOf:
+        - $ref: '#/components/schemas/Room'
+        - type: object
+          required: [studentCount, onlineCount]
+          properties:
+            studentCount:
+              type: integer
+            onlineCount:
+              type: integer
+
+    AdminRoomSummary:
+      allOf:
+        - $ref: '#/components/schemas/TeacherRoomSummary'
+        - type: object
+          properties:
+            teacherName:
+              type: string
+
+    ClientInfo:
+      type: object
+      required:
+        - clientId
+        - studentId
+        - studentName
+        - ip
+        - hostname
+        - online
+        - guardActive
+        - processCount
+        - lastSeen
+        - violations
+      properties:
+        clientId:
+          type: string
+        studentId:
+          type: string
+          nullable: true
+        studentName:
+          type: string
+          nullable: true
+        ip:
+          type: string
+        hostname:
+          type: string
+        online:
+          type: boolean
+        guardActive:
+          type: boolean
+        processCount:
+          type: integer
+        lastSeen:
+          type: integer
+          format: int64
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViolationEntry'
+
+    RoomCreateRequest:
+      type: object
+      required: [roomName]
+      properties:
+        roomName:
+          type: string
+        guard:
+          $ref: '#/components/schemas/GuardConfig'
+        schedule:
+          $ref: '#/components/schemas/ScheduleConfig'
+        whitelist:
+          $ref: '#/components/schemas/RoomWhitelist'
+        violations:
+          $ref: '#/components/schemas/ViolationsConfig'
+        students:
+          type: array
+          items:
+            $ref: '#/components/schemas/Student'
+
+    RoomUpdateRequest:
+      type: object
+      properties:
+        roomName:
+          type: string
+        guard:
+          type: object
+          additionalProperties: true
+        schedule:
+          type: object
+          additionalProperties: true
+        whitelist:
+          type: object
+          additionalProperties: true
+        violations:
+          type: object
+          additionalProperties: true
+
+    StudentBindRequest:
+      type: object
+      required: [joinCode, studentId]
+      properties:
+        joinCode:
+          type: string
+        studentId:
+          type: string
+        name:
+          type: string
+        hostname:
+          type: string
+        clientId:
+          type: string
+
+    StudentBindResponse:
+      type: object
+      required: [ok, studentId, name, roomId, roomName]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        studentId:
+          type: string
+        name:
+          type: string
+        roomId:
+          type: string
+        roomName:
+          type: string

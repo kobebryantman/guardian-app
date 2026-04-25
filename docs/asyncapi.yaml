@@ -1,0 +1,310 @@
+asyncapi: 2.6.0
+info:
+  title: Guardian Server WebSocket API
+  version: 1.0.0
+  description: |
+    Guardian 实时通信（WebSocket）协议文档。
+    服务端 WebSocket 地址：`ws://{host}:3847/guardian-ws`
+
+    生命周期约束：
+    - 连接建立后服务端先下发 `welcome`
+    - 客户端需在 30 秒内完成 `bind`，否则服务端关闭连接
+    - 服务端每 30 秒巡检，120 秒未收到心跳/消息会强制断开
+
+defaultContentType: application/json
+
+servers:
+  local:
+    url: '{host}:3847'
+    protocol: ws
+    description: 本地或局域网服务端
+    variables:
+      host:
+        default: localhost
+
+channels:
+  /guardian-ws:
+    description: 学生子机与服务端的实时双向通道
+    subscribe:
+      operationId: clientToServer
+      summary: 客户端 -> 服务端消息
+      message:
+        oneOf:
+          - $ref: '#/components/messages/BindMessage'
+          - $ref: '#/components/messages/HeartbeatMessage'
+          - $ref: '#/components/messages/ViolationLogMessage'
+    publish:
+      operationId: serverToClient
+      summary: 服务端 -> 客户端消息
+      message:
+        oneOf:
+          - $ref: '#/components/messages/WelcomeMessage'
+          - $ref: '#/components/messages/BindAckMessage'
+          - $ref: '#/components/messages/HeartbeatAckMessage'
+          - $ref: '#/components/messages/ToggleGuardMessage'
+          - $ref: '#/components/messages/UpdateWhitelistMessage'
+          - $ref: '#/components/messages/ForceKillProcessMessage'
+          - $ref: '#/components/messages/BroadcastMessage'
+
+components:
+  schemas:
+    StudentRef:
+      type: object
+      required: [studentId, name]
+      properties:
+        studentId:
+          type: string
+        name:
+          type: string
+
+    ProcessEntry:
+      type: object
+      required: [name, enabled]
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+
+    BrowserEntry:
+      type: object
+      required: [name, enabled]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+
+    UrlRule:
+      type: object
+      required: [pattern, type]
+      properties:
+        pattern:
+          type: string
+        type:
+          type: string
+          enum: [allow, deny]
+        description:
+          type: string
+
+    RoomWhitelist:
+      type: object
+      required: [processes, browsers, urls]
+      properties:
+        processes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessEntry'
+        browsers:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrowserEntry'
+        urls:
+          type: array
+          items:
+            $ref: '#/components/schemas/UrlRule'
+
+    ViolationEntry:
+      type: object
+      properties:
+        pid:
+          type: integer
+        name:
+          type: string
+        title:
+          type: string
+        time:
+          type: string
+        action:
+          type: string
+
+    BindPayload:
+      type: object
+      required: [type, studentId]
+      properties:
+        type:
+          type: string
+          enum: [bind]
+        roomCode:
+          type: string
+          description: 房间接入码（优先字段）
+        joinCode:
+          type: string
+          description: 房间接入码（兼容字段）
+        studentId:
+          type: string
+        name:
+          type: string
+        hostname:
+          type: string
+
+    HeartbeatPayload:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [heartbeat]
+        guardActive:
+          type: boolean
+        processCount:
+          type: integer
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViolationEntry'
+
+    ViolationLogPayload:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [violation-log]
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViolationEntry'
+
+    WelcomePayload:
+      type: object
+      required: [type, clientId]
+      properties:
+        type:
+          type: string
+          enum: [welcome]
+        clientId:
+          type: string
+
+    BindAckPayload:
+      type: object
+      required: [type, ok]
+      properties:
+        type:
+          type: string
+          enum: [bind-ack]
+        ok:
+          type: boolean
+        roomId:
+          type: string
+        roomName:
+          type: string
+        msg:
+          type: string
+      description: |
+        `ok=true` 时返回 roomId/roomName；`ok=false` 时返回 msg。
+
+    HeartbeatAckPayload:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [heartbeat-ack]
+
+    ToggleGuardPayload:
+      type: object
+      required: [type, enabled]
+      properties:
+        type:
+          type: string
+          enum: [toggle-guard]
+        enabled:
+          type: boolean
+
+    UpdateWhitelistPayload:
+      type: object
+      required: [type, whitelist]
+      properties:
+        type:
+          type: string
+          enum: [update-whitelist]
+        whitelist:
+          $ref: '#/components/schemas/RoomWhitelist'
+
+    ForceKillProcessPayload:
+      type: object
+      required: [type, pid]
+      properties:
+        type:
+          type: string
+          enum: [force-kill-process]
+        pid:
+          type: integer
+
+    BroadcastPayload:
+      type: object
+      required: [type, message]
+      properties:
+        type:
+          type: string
+          enum: [broadcast]
+        message:
+          type: string
+
+  messages:
+    BindMessage:
+      name: BindMessage
+      title: 绑定房间
+      payload:
+        $ref: '#/components/schemas/BindPayload'
+
+    HeartbeatMessage:
+      name: HeartbeatMessage
+      title: 心跳上报
+      payload:
+        $ref: '#/components/schemas/HeartbeatPayload'
+
+    ViolationLogMessage:
+      name: ViolationLogMessage
+      title: 违规日志上报
+      payload:
+        $ref: '#/components/schemas/ViolationLogPayload'
+
+    WelcomeMessage:
+      name: WelcomeMessage
+      title: 连接欢迎
+      payload:
+        $ref: '#/components/schemas/WelcomePayload'
+
+    BindAckMessage:
+      name: BindAckMessage
+      title: 绑定结果
+      payload:
+        $ref: '#/components/schemas/BindAckPayload'
+
+    HeartbeatAckMessage:
+      name: HeartbeatAckMessage
+      title: 心跳确认
+      payload:
+        $ref: '#/components/schemas/HeartbeatAckPayload'
+
+    ToggleGuardMessage:
+      name: ToggleGuardMessage
+      title: 开关守卫
+      payload:
+        $ref: '#/components/schemas/ToggleGuardPayload'
+
+    UpdateWhitelistMessage:
+      name: UpdateWhitelistMessage
+      title: 下发白名单
+      payload:
+        $ref: '#/components/schemas/UpdateWhitelistPayload'
+
+    ForceKillProcessMessage:
+      name: ForceKillProcessMessage
+      title: 强制结束进程
+      payload:
+        $ref: '#/components/schemas/ForceKillProcessPayload'
+
+    BroadcastMessage:
+      name: BroadcastMessage
+      title: 广播通知
+      payload:
+        $ref: '#/components/schemas/BroadcastPayload'

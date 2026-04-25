@@ -1,59 +1,90 @@
-/**
- * WebSocket 子机接入处理
- */
 const { WebSocketServer } = require('ws');
-const os = require('os');
+const store = require('./mock-state');
 
-function setupWebSocket(server, clients) {
+function setupWebSocket(server) {
   const wss = new WebSocketServer({ server, path: '/guardian-ws' });
 
   wss.on('connection', (ws, req) => {
-    const ip = req.socket.remoteAddress.replace('::ffff:', '');
-    const clientId = `${ip}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const ip = String(req.socket.remoteAddress || '').replace('::ffff:', '');
+    const client = store.createClient(ws, ip);
 
-    clients.set(clientId, { ws, ip, clientId, studentId: null, hostname: os.hostname(), lastSeen: Date.now(), guardActive: false, violations: [], processCount: 0 });
-    console.log(`[WS] 子机接入: ${clientId} (${ip})，当前在线: ${clients.size}`);
-    ws.send(JSON.stringify({ type: 'welcome', clientId }));
+    ws.send(JSON.stringify({ type: 'welcome', clientId: client.clientId }));
 
-    ws.on('message', (raw) => {
+    const bindTimeout = setTimeout(() => {
+      const current = store.getClient(client.clientId);
+      if (current && !current.roomId) {
+        ws.close(4000, 'bind timeout');
+      }
+    }, 30000);
+
+    ws.on('message', raw => {
       let msg;
-      try { msg = JSON.parse(raw); } catch { return; }
-      const info = clients.get(clientId);
-      if (!info) return;
-      info.lastSeen = Date.now();
+      try {
+        msg = JSON.parse(raw.toString());
+      } catch (_) {
+        return;
+      }
+
+      store.touchClient(client.clientId);
+
       switch (msg.type) {
-        case 'bind':
-          info.studentId = msg.studentId || null;
-          info.hostname = msg.hostname || os.hostname();
-          console.log(`[WS] ${clientId} 绑定学生: ${msg.studentId}`);
+        case 'bind': {
+          const joinCode = msg.roomCode || msg.joinCode;
+          const room = store.findRoomByJoinCode(joinCode);
+          if (!room) {
+            ws.send(JSON.stringify({ type: 'bind-ack', ok: false, msg: '房间码无效' }));
+            return;
+          }
+
+          const student = store.findStudentInRoom(room, msg.studentId);
+          if (!student) {
+            ws.send(JSON.stringify({ type: 'bind-ack', ok: false, msg: '该学号未在本房间注册' }));
+            return;
+          }
+
+          store.bindClient(client.clientId, {
+            roomId: room.id,
+            studentId: student.studentId,
+            studentName: msg.name || student.name,
+            hostname: msg.hostname || ''
+          });
+
+          ws.send(JSON.stringify({
+            type: 'bind-ack',
+            ok: true,
+            roomId: room.id,
+            roomName: room.roomName
+          }));
           break;
+        }
+
         case 'heartbeat':
-          info.guardActive = msg.guardActive;
-          info.processCount = msg.processCount || 0;
-          if (msg.violations) info.violations = [...msg.violations, ...info.violations].slice(0, 50);
+          store.updateClientHeartbeat(client.clientId, msg);
           ws.send(JSON.stringify({ type: 'heartbeat-ack' }));
           break;
+
         case 'violation-log':
-          info.violations = [...(msg.violations || []), ...info.violations].slice(0, 50);
+          store.appendClientViolations(client.clientId, msg.violations || []);
+          break;
+
+        default:
           break;
       }
     });
 
     ws.on('close', () => {
-      console.log(`[WS] 子机断开: ${clientId}，当前在线: ${clients.size}`);
-      clients.delete(clientId);
+      clearTimeout(bindTimeout);
+      store.deleteClient(client.clientId);
     });
-    ws.on('error', (err) => {
-      console.error(`[WS] ${clientId} 错误:`, err.message);
-      clients.delete(clientId);
+
+    ws.on('error', () => {
+      clearTimeout(bindTimeout);
+      store.deleteClient(client.clientId);
     });
   });
 
   setInterval(() => {
-    const now = Date.now();
-    clients.forEach((info, clientId) => {
-      if (now - info.lastSeen > 120000) { info.ws.terminate(); clients.delete(clientId); }
-    });
+    store.pruneInactiveClients(120000);
   }, 30000);
 }
 

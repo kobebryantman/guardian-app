@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guardian AsyncAPI</title>
+  <link rel="stylesheet" href="https://unpkg.com/@stoplight/elements/styles.min.css" />
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+    }
+    elements-api {
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <elements-api
+    apiDescriptionUrl="/docs/spec/asyncapi.yaml"
+    router="hash"
+    layout="sidebar"
+  ></elements-api>
+
+  <script src="https://unpkg.com/@stoplight/elements/web-components.min.js"></script>
+</body>
+</html>

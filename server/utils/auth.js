@@ -1,47 +1,55 @@
-/**
- * Token 生成/验证 + 认证中间件
- */
 const crypto = require('crypto');
-const path = require('path');
-const { loadJSON, saveJSON } = require('./storage');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const ADMIN_FILE = path.join(DATA_DIR, 'admin.json');
-const SECRET = 'guardian-secret-2026';
+const SECRET = 'guardian-api-secret';
 
-function makeToken(id) {
-  const data = `${id}:${Date.now()}`;
-  return Buffer.from(`${data}:${crypto.createHmac('sha1', SECRET).update(data).digest('hex')}`).toString('base64');
+function makeToken(payload = {}) {
+  const content = {
+    ...payload,
+    iat: Date.now()
+  };
+  const body = Buffer.from(JSON.stringify(content)).toString('base64url');
+  const sign = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+  return `${body}.${sign}`;
 }
 
 function verifyToken(token) {
   try {
-    const decoded = Buffer.from(token, 'base64').toString('utf-8');
-    const parts = decoded.split(':');
-    if (parts.length < 3) return null;
-    return parts[0];
-  } catch { return null; }
-}
-
-/** Express 中间件：验证 x-token header */
-function requireAuth(req, res, next) {
-  const id = verifyToken(req.headers['x-token']);
-  if (!id) return res.status(401).json({ ok: false, msg: '未登录或 token 无效' });
-  req.authId = id;
-  next();
-}
-
-/** 首次启动时创建默认管理员 */
-function ensureAdmin() {
-  const admins = loadJSON(ADMIN_FILE, []);
-  if (admins.length === 0) {
-    admins.push({
-      username: 'admin',
-      passwordHash: crypto.createHash('sha256').update('guardian2026').digest('hex'),
-      role: 'admin'
-    });
-    saveJSON(ADMIN_FILE, admins);
+    if (!token || typeof token !== 'string') return null;
+    const [body, sign] = token.split('.');
+    if (!body || !sign) return null;
+    const expected = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+    if (expected !== sign) return null;
+    return JSON.parse(Buffer.from(body, 'base64url').toString('utf-8'));
+  } catch (_) {
+    return null;
   }
 }
 
-module.exports = { makeToken, verifyToken, requireAuth, ensureAdmin };
+function requireAuth(req, res, next) {
+  const claims = verifyToken(req.headers['x-token']);
+  if (!claims) {
+    return res.status(401).json({ ok: false, msg: '未登录或 token 无效' });
+  }
+  req.auth = claims;
+  next();
+}
+
+function requireRole(role) {
+  return (req, res, next) => {
+    if (!req.auth || req.auth.role !== role) {
+      return res.status(403).json({ ok: false, msg: '无权限' });
+    }
+    next();
+  };
+}
+
+const requireAdmin = [requireAuth, requireRole('admin')];
+const requireTeacher = [requireAuth, requireRole('teacher')];
+
+module.exports = {
+  makeToken,
+  verifyToken,
+  requireAuth,
+  requireAdmin,
+  requireTeacher
+};

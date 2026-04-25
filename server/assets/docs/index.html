@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guardian API Docs</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #102a43;
+      --muted: #627d98;
+      --brand: #0f6fff;
+      --brand2: #00a6a6;
+      --border: #d9e2ec;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at top right, #dbeafe, transparent 45%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .panel {
+      width: min(860px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 12px 36px rgba(16, 42, 67, 0.08);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 28px;
+      background: linear-gradient(125deg, #0f6fff 0%, #00a6a6 100%);
+      color: #fff;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+    }
+    .hero p {
+      margin: 0;
+      opacity: 0.9;
+      font-size: 14px;
+    }
+    .content {
+      padding: 24px;
+      display: grid;
+      gap: 14px;
+    }
+    .item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .item h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .item p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: #fff;
+    }
+    .btn.primary {
+      border-color: transparent;
+      color: #fff;
+      background: var(--brand);
+    }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <section class="hero">
+      <h1>Guardian 文档入口</h1>
+      <p>REST 和 WebSocket 协议可视化页面</p>
+    </section>
+
+    <section class="content">
+      <article class="item">
+        <h2>REST API（OpenAPI）</h2>
+        <p>接口：管理员、教师、房间、学生绑定。</p>
+        <div class="links">
+          <a class="btn primary" href="/docs/openapi.html">打开可视化</a>
+          <a class="btn" href="/docs/spec/openapi.yaml" target="_blank" rel="noreferrer">查看 YAML</a>
+        </div>
+      </article>
+
+      <article class="item">
+        <h2>WebSocket（AsyncAPI）</h2>
+        <p>通道：<code>/guardian-ws</code>，包含 welcome/bind/heartbeat 等消息。</p>
+        <div class="links">
+          <a class="btn primary" href="/docs/asyncapi.html">打开可视化</a>
+          <a class="btn" href="/docs/spec/asyncapi.yaml" target="_blank" rel="noreferrer">查看 YAML</a>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
