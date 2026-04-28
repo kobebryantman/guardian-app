@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('guardian', {
   // 远程管控 API
   getRemoteConfig: () => ipcRenderer.invoke('get-remote-config'),
   saveRemoteConfig: (data) => ipcRenderer.invoke('save-remote-config', data),
-  bindStudent: (code) => ipcRenderer.invoke('bind-student', code),
+  bindStudent: (code, studentId, studentName) => ipcRenderer.invoke('bind-student', { joinCode: code, studentId, studentName }),
 
   // 事件监听
   onGuardStatus: (cb) => ipcRenderer.on('guard-status', (_, v) => cb(v)),

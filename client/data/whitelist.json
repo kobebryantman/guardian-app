@@ -1,38 +1,13 @@
 {
   "processes": [
-    "explorer.exe",
-    "guardian-app.exe",
-    "electron.exe",
-    "Code.exe",
     "notepad.exe",
-    "mspaint.exe",
-    "calc.exe",
-    "cmd.exe",
-    "powershell.exe",
-    "taskmgr.exe",
-    "SystemSettings.exe",
-    "cxstudy.exe",
-    "devcpp.exe",
-    "weixin.exe"
+    "360tray.exe",
+    "QQ.exe"
   ],
   "urls": [
-    "localhost",
-    "127.0.0.1",
-    "baidu.com",
-    "bing.com",
-    "qq.com",
-    "wechat.com",
-    "wenku.baidu.com"
+    "example.com"
   ],
   "browsers": [
-    "chrome.exe",
-    "msedge.exe",
-    "firefox.exe",
-    "opera.exe",
-    "360chrome.exe",
-    "2345Explorer.exe",
-    "liebao.exe",
-    "SogouExplorer.exe",
-    "quark.exe"
+    "chrome.exe"
   ]
 }

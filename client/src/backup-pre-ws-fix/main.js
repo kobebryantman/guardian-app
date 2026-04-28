@@ -88,7 +88,7 @@ function initRemote() {
 
     remote.connect(remoteConfig.serverUrl);
     if (remoteConfig.studentId) {
-      remote.bindStudent(remoteConfig.studentId, remoteConfig.studentName || '', remoteConfig.joinCode || remoteConfig.bindCode || '');
+      remote.bindStudent(remoteConfig.studentId, remoteConfig.studentName || '');
     }
   }
 }

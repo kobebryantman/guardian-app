@@ -104,6 +104,19 @@ router.post('/:id/broadcast', async (req, res) => {
   return res.json({ ok: true, sent });
 });
 
+router.post('/:id/push-whitelist', async (req, res) => {
+  const room = await getOwnedRoomAsync(req, res);
+  if (!room) return;
+
+  const whitelist = req.body?.whitelist;
+  if (!whitelist) {
+    return res.status(400).json({ ok: false, msg: '白名单内容不能为空' });
+  }
+
+  const sent = await stateService.sendToRoom(room.id, { type: 'update-whitelist', whitelist });
+  return res.json({ ok: true, sent });
+});
+
 router.get('/:id/students', async (req, res) => {
   const room = await getOwnedRoomAsync(req, res);
   if (!room) return;

@@ -50,23 +50,17 @@ function emit(evt, data) { (listeners[evt] || []).forEach(cb => cb(data)); }
 // ---------- 连接 ----------
 function connect(url) {
   serverUrl = url;
-  // 自动拼接 WS 路径（服务端 gateway 路径为 /guardian-ws）
-  let wsUrl = url;
-  if (!wsUrl.endsWith('/guardian-ws')) {
-    wsUrl = wsUrl.replace(/\/+$/, '') + '/guardian-ws';
-  }
-  _doConnect(wsUrl);
+  _doConnect();
 }
 
-function _doConnect(wsUrl) {
+function _doConnect() {
   if (ws && ws.readyState < 2) return; // 正在连接或已连接
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
 
-  const targetUrl = wsUrl || (serverUrl.replace(/\/+$/, '') + '/guardian-ws');
-  safeLog('[Remote] 连接管控服务器:', targetUrl);
+  safeLog('[Remote] 连接管控服务器:', serverUrl);
   try {
-    ws = new WebSocket(targetUrl);
+    ws = new WebSocket(serverUrl);
   } catch (e) {
     console.error('[Remote] WebSocket 创建失败:', e.message);
     _scheduleReconnect();

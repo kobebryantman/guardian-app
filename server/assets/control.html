@@ -1325,19 +1325,73 @@
       // ── 房间管理 ──
       async function renderRooms(area) {
         if (role === "admin") {
+          const selRoom = selectedRoomId
+            ? cachedRooms.find((r) => r.id === selectedRoomId)
+            : null;
+          let detailHTML = "";
+          if (selRoom) {
+            const dr = await get("/api/admin/rooms/" + selRoom.id);
+            if (dr.ok && dr.room) {
+              const students = dr.room.students || [];
+              const clients = dr.room.clients || [];
+              detailHTML = `
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="section-title" style="margin:0">${selRoom.roomName} 详情</div>
+            <div class="section-title" style="margin:0"><span class="hint">接入码 ${selRoom.joinCode} · 👤 ${selRoom.teacherName || "未知"}</span></div>
+          </div>
+          <div class="section-title" style="font-size:13px">学生列表 (${students.length})</div>
+          <table style="margin-bottom:16px">
+            <thead><tr><th>学号</th><th>姓名</th><th>状态</th></tr></thead>
+            <tbody>${
+              students.length === 0
+                ? '<tr><td colspan="3" style="text-align:center;color:var(--muted)">暂无学生</td></tr>'
+                : students
+                    .map((s) => {
+                      const cl = clients.find((c) => c.studentId === s.studentId);
+                      return `<tr>
+                <td>${s.studentId}</td>
+                <td>${s.name}</td>
+                <td>${cl ? '<span style="color:#4caf50">● 在线</span>' : '<span style="color:var(--muted)">○ 离线</span>'}</td>
+              </tr>`;
+                    })
+                    .join("")
+            }</tbody>
+          </table>
+          <div class="section-title" style="font-size:13px">在线客户端 (${clients.length})</div>
+          <table>
+            <thead><tr><th>学号</th><th>姓名</th><th>主机名</th><th>IP</th><th>守卫状态</th><th>违规</th></tr></thead>
+            <tbody>${
+              clients.length === 0
+                ? '<tr><td colspan="6" style="text-align:center;color:var(--muted)">暂无在线客户端</td></tr>'
+                : clients
+                    .map((c) => `<tr>
+                <td>${c.studentId || "-"}</td>
+                <td>${c.studentName || "-"}</td>
+                <td>${c.hostname || "-"}</td>
+                <td>${c.ip || "-"}</td>
+                <td>${c.guardActive ? "🟢 守卫中" : "⏸ 未启动"}</td>
+                <td>${c.violationCount || 0}</td>
+              </tr>`)
+                    .join("")
+            }</tbody>
+          </table>
+        </div>`;
+            }
+          }
           area.innerHTML = `
       <div class="section-title">所有教室 <span class="hint">共 ${
         cachedRooms.length
-      } 间</span></div>
+      } 间 · 点击查看详情</span></div>
       <div class="room-grid">
         ${
           cachedRooms.length === 0
             ? '<div class="empty">暂无教室</div>'
             : cachedRooms
                 .map(
-                  (r) => `<div class="room-card" onclick="selectRoom('${
-                    r.id
-                  }')">
+                  (r) => `<div class="room-card ${
+                    r.id === selectedRoomId ? "selected" : ""
+                  }" onclick="selectRoom('${r.id}')">
             <div class="top"><div class="name">${
               r.roomName
             }</div><div class="join-code">${r.joinCode}</div></div>
@@ -1351,7 +1405,7 @@
                 .join("")
         }
       </div>
-    `;
+    ${detailHTML}`;
         } else {
           area.innerHTML = `
       <div class="section-title">我的教室 <span class="hint">共 ${
@@ -1848,8 +1902,16 @@
         const r = await put("/api/rooms/" + selectedRoomId, {
           whitelist: { processes, browsers, urls },
         });
-        if (r.ok) toast("白名单已保存");
-        else toast(r.msg || "保存失败", true);
+        if (r.ok) {
+          // 保存成功后，批量下发白名单到所有在线子机
+          const pr = await post("/api/rooms/" + selectedRoomId + "/push-whitelist", {
+            whitelist: { processes, browsers, urls },
+          });
+          if (pr.ok) toast("白名单已保存并下发至 " + (pr.sent || 0) + " 台子机");
+          else toast("白名单已保存，但下发失败：" + (pr.msg || "未知错误"), true);
+        } else {
+          toast(r.msg || "保存失败", true);
+        }
       }
 
       // ── 违规日志 ──

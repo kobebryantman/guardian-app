@@ -522,7 +522,7 @@
     </div>
 
     <!-- 远程管控 -->
-    <div class="page" id="page-remote" style="display:none">
+    <div class="page" id="page-remote">
       <div class="card">
         <div class="card-title"><span>🌐</span> 远程管控设置</div>
 
@@ -548,8 +548,10 @@
             <div class="settings-desc">输入教师分配给你的接入码，将本机绑定到对应学生名下</div>
           </div>
         </div>
-        <div style="display:none;gap:8px;align-items:center;margin-bottom:10px" id="remoteBindInputRow">
-          <input type="text" id="bindCode" class="text-input" placeholder="接入码（6位）" maxlength="8" style="flex:1">
+        <div style="display:none;flex-direction:column;gap:8px;margin-bottom:10px" id="remoteBindInputRow">
+          <input type="text" id="bindStudentId" class="text-input" placeholder="学号" maxlength="20" style="width:100%">
+          <input type="text" id="bindStudentName" class="text-input" placeholder="姓名" maxlength="20" style="width:100%">
+          <input type="text" id="bindCode" class="text-input" placeholder="接入码（6位）" maxlength="8" style="width:100%">
           <button class="btn btn-primary" onclick="doBindStudent()" id="bindBtn">绑定</button>
         </div>
         <div id="bindStatus" style="font-size:13px;padding:8px 12px;border-radius:6px;display:none"></div>
@@ -835,19 +837,27 @@ async function saveRemoteSettings() {
 }
 
 async function doBindStudent() {
+  const studentId = document.getElementById('bindStudentId').value.trim();
+  const studentName = document.getElementById('bindStudentName').value.trim();
   const code = document.getElementById('bindCode').value.trim().toUpperCase();
+  if (!studentId) { showToast('请输入学号', 'warn'); return; }
   if (!code) { showToast('请输入接入码', 'warn'); return; }
   const btn = document.getElementById('bindBtn');
   btn.textContent = '绑定中...'; btn.disabled = true;
-  const r = await window.guardian.bindStudent(code);
-  btn.disabled = false; btn.textContent = '绑定';
-  if (r.ok) {
-    showBindStatus(true, r.studentName);
-    showToast(`✅ 已绑定：${r.studentName}`, 'success');
-  } else {
-    showBindStatus(false, r.msg || '绑定失败');
-    showToast(r.msg || '绑定失败', 'warn');
+  try {
+    const r = await window.guardian.bindStudent(code, studentId, studentName);
+    if (r.ok) {
+      showBindStatus(true, r.studentName);
+      showToast(`✅ 已绑定：${r.studentName}`, 'success');
+    } else {
+      showBindStatus(false, r.msg || '绑定失败');
+      showToast(r.msg || '绑定失败', 'warn');
+    }
+  } catch (e) {
+    showBindStatus(false, '绑定请求异常');
+    showToast('绑定请求异常', 'warn');
   }
+  btn.disabled = false; btn.textContent = '绑定';
 }
 
 function showBindStatus(success, text) {
