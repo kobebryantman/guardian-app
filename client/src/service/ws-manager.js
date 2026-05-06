@@ -138,13 +138,6 @@ class WsManager extends EventEmitter {
     }
   }
 
-  // 客户端发送消息
-  /**
-   * 发送：绑定房间
-   * 对应 asyncapi.yaml: BindMessage / BindPayload
-   * 必填：type, studentId
-   * 可选：roomCode, joinCode, name, hostname
-   */
   sendBind({ studentId, joinCode, name, hostname }) {
     return this._send({
       type: 'bind',           // 必填，enum[bind]
@@ -155,12 +148,7 @@ class WsManager extends EventEmitter {
     });
   }
 
-  /**
-   * 发送：心跳上报
-   * 对应 asyncapi.yaml: HeartbeatMessage / HeartbeatPayload
-   * 必填：type
-   * 可选：guardActive, processCount, violations
-   */
+
   sendHeartbeat({ guardActive, processCount, violations }) {
     return this._send({
       type: 'heartbeat',           // 必填，enum[heartbeat]
@@ -170,18 +158,7 @@ class WsManager extends EventEmitter {
     });
   }
 
-  /**
-   * 发送：违规日志上报
-   * 对应 asyncapi.yaml: ViolationLogMessage / ViolationLogPayload
-   * 必填：type
-   * 可选：violations
-   */
-  sendViolationLog(violations) {
-    return this._send({
-      type: 'violation-log',        // 必填，enum[violation-log]
-      violations: violations || [],  // 可选，ViolationEntry[]
-    });
-  }
+
 
   // ==================== 内部方法 ====================
 

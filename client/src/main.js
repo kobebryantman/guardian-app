@@ -17,8 +17,8 @@ let studentInfo = null;      // 学生信息
 // ============ 登录窗口 ============
 function createLoginWindow() {
   loginWindow = new BrowserWindow({
-    width: 400,
-    height: 440,
+    width: 440,
+    height: 460,
     frame: true,
     resizable: true,
     alwaysOnTop: true,
@@ -40,7 +40,7 @@ function createFloatingWindow() {
 
   floatingWindow = new BrowserWindow({
     width: 340,
-    height: 200,
+    height: 280,
     frame: false,
     alwaysOnTop: true,
     transparent: false,
@@ -57,7 +57,7 @@ function createFloatingWindow() {
 
   // 定位到右下角
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  floatingWindow.setPosition(width - 350, height - 210);
+  floatingWindow.setPosition(width - 350, height - 290);
 
   floatingWindow.on('closed', () => { floatingWindow = null; });
 }
