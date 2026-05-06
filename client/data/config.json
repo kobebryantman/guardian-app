@@ -1,8 +1,6 @@
 {
-  "enabled": false,
-  "checkInterval": 3000,
-  "killUnknown": false,
-  "notifyOnly": true,
-  "startWithWindows": false,
-  "minimizeToTray": true
+  "studentId": "",
+  "name": "未知",
+  "roomId": "r_e454bd69",
+  "roomName": "房间测试"
 }

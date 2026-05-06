@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guardian - 监控状态</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 340px;
+      height: 200px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+
+    .container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 8px;
+    }
+
+    .header {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #e0e0e0;
+      border-left: 3px solid #00d4ff;
+    }
+
+    .header-title {
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+
+    .header-info {
+      color: #a0a0a0;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px;
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+      color: #e0e0e0;
+    }
+
+    .content::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .content::-webkit-scrollbar-thumb {
+      background: #404070;
+      border-radius: 2px;
+    }
+
+    .content::-webkit-scrollbar-thumb:hover {
+      background: #505090;
+    }
+
+    .violation-item {
+      background: rgba(255, 107, 107, 0.15);
+      border-left: 2px solid #ff6b6b;
+      padding: 4px 6px;
+      margin-bottom: 4px;
+      border-radius: 2px;
+      line-height: 1.4;
+      -webkit-app-region: no-drag;
+    }
+
+    .violation-name {
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .violation-time {
+      color: #a0a0a0;
+      font-size: 10px;
+    }
+
+    .empty-state {
+      color: #707090;
+      text-align: center;
+      padding: 20px 10px;
+    }
+
+    .footer {
+      display: flex;
+      gap: 6px;
+      padding-top: 4px;
+    }
+
+    button {
+      flex: 1;
+      padding: 6px;
+      border: none;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      -webkit-app-region: no-drag;
+    }
+
+    .logout-btn {
+      background: #ff6b6b;
+      color: white;
+    }
+
+    .logout-btn:hover {
+      background: #ff5555;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .status-online {
+      background: #51cf66;
+    }
+
+    .status-warning {
+      background: #ffd93d;
+    }
+
+    .status-offline {
+      background: #808080;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-title">
+        <span class="status-indicator status-online" id="statusIndicator"></span>
+        <span id="roomInfo">加载中...</span>
+      </div>
+      <div class="header-info">
+        <div id="studentInfo"></div>
+      </div>
+    </div>
+
+    <div class="content" id="violationList">
+      <div class="empty-state">暂无违规</div>
+    </div>
+
+    <div class="footer">
+      <button class="logout-btn" id="logoutBtn">登出</button>
+    </div>
+  </div>
+
+  <script>
+    const roomInfoEl = document.getElementById('roomInfo');
+    const studentInfoEl = document.getElementById('studentInfo');
+    const violationListEl = document.getElementById('violationList');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const statusIndicatorEl = document.getElementById('statusIndicator');
+
+    let studentInfo = null;
+    let violations = [];
+    let updateInterval = null;
+
+    // 初始化：获取学生信息
+    async function init() {
+      try {
+        studentInfo = await window.guardian.getStudentInfo();
+        if (studentInfo) {
+          updateDisplay();
+        }
+      } catch (err) {
+        console.error('Failed to get student info:', err);
+      }
+    }
+
+    // 定期扫描进程，检测违规
+    function startProcessMonitor() {
+      setInterval(async () => {
+        try {
+          // 1. 拿到当前所有进程
+          const processes = await window.guardian.scanProcesses();
+
+          // 2. 拿到白名单
+          const whitelist = await window.guardian.getWhitelist();
+
+          // 3. 对比，找出违规进程
+          const whitelistNames = (whitelist || []).map(w =>
+            w.name?.toLowerCase() || w.toLowerCase()
+          );
+
+          const newViolations = processes.filter(p => {
+            const name = p.name.toLowerCase();
+            return !whitelistNames.includes(name);
+          });
+
+          // 4. 如果有新的违规，加进 violations 数组并刷新显示
+          if (newViolations.length > 0) {
+            for (const v of newViolations) {
+              // 避免重复记录同一个进程
+              const exists = violations.some(existing =>
+                existing.processName === v.name
+              );
+              if (!exists) {
+                violations.push({
+                  processName: v.name,
+                  pid: v.pid,
+                  time: Date.now(),
+                });
+              }
+            }
+
+            // 最多保留50条
+            if (violations.length > 50) violations = violations.slice(0, 50);
+
+            updateDisplay();
+          }
+        } catch (err) {
+          console.error('[Process Monitor] 扫描失败:', err);
+        }
+      }, 5000); // 每5秒扫描一次
+    }
+
+
+    // 更新显示
+    function updateDisplay() {
+      if (!studentInfo) return;
+
+      // 更新头部信息
+      roomInfoEl.textContent = `${studentInfo.roomId || '?'} - ${studentInfo.roomName || ''}`;
+      studentInfoEl.textContent = `${studentInfo.name || '未知'} (${studentInfo.studentId || '?'})`;
+
+      // 更新违规列表
+      if (violations.length === 0) {
+        violationListEl.innerHTML = '<div class="empty-state">暂无违规</div>';
+      } else {
+        violationListEl.innerHTML = violations
+          .map((v) => {
+            const time = v.time ? new Date(v.time).toLocaleTimeString('zh-CN') : '未知时间';
+            return `
+              <div class="violation-item">
+                <div class="violation-name">🚫 ${v.processName || v.name || '未知进程'}</div>
+                <div class="violation-time">${time}</div>
+              </div>
+            `;
+          })
+          .join('');
+      }
+    }
+
+    // 定期上报违规列表（心跳）
+    function startHeartbeat() {
+      if (updateInterval) clearInterval(updateInterval);
+
+      updateInterval = setInterval(async () => {
+        if (studentInfo) {
+          try {
+            await window.guardian.reportViolations(violations);
+          } catch (err) {
+            console.error('Failed to report violations:', err);
+          }
+        }
+      }, 15000); // 每15秒上报一次
+    }
+
+    // 登出
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        if (updateInterval) clearInterval(updateInterval);
+        await window.guardian.logout();
+      } catch (err) {
+        console.error('Logout failed:', err);
+      }
+    });
+
+    // 监听 IPC 事件
+
+    // 学生信息更新（绑定成功后）
+    window.guardian.on('student:info', (info) => {
+      studentInfo = info;
+      updateDisplay();
+      startHeartbeat();
+    });
+
+    // 教师通过守卫状态变化
+    window.guardian.on('guard:status-changed', (data) => {
+      // 学生无法关闭守卫，只能看到状态
+      if (data.enabled) {
+        statusIndicatorEl.className = 'status-indicator status-online';
+      } else {
+        statusIndicatorEl.className = 'status-indicator status-warning';
+      }
+    });
+
+    // 教师远程杀进程
+    window.guardian.on('process:killed', (data) => {
+      if (data.processName || data.name) {
+        violations.unshift({
+          processName: data.processName || data.name,
+          time: new Date(),
+        });
+
+        // 保持最多10条记录
+        if (violations.length > 10) {
+          violations = violations.slice(0, 10);
+        }
+
+        updateDisplay();
+      }
+    });
+
+    // 服务器通用消息
+    window.guardian.on('server:message', (msg) => {
+      console.log('[Server Message]', msg);
+    });
+
+    // 初始化
+    init();
+    startProcessMonitor();
+    startHeartbeat();
+  </script>
+</body>
+
+</html>

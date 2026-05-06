@@ -1,40 +1,37 @@
 /**
- * Preload Script - 安全桥梁
- * 将主进程API安全地暴露给渲染进程
+ * Preload 脚本 - 安全桥梁
+ * 学生端简化版：仅暴露绑定、获取信息、上报违规、登出等 API
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('guardian', {
-  // 数据获取
-  getWhitelist: () => ipcRenderer.invoke('get-whitelist'),
-  getConfig: () => ipcRenderer.invoke('get-config'),
-  getViolations: () => ipcRenderer.invoke('get-violations'),
-  getGuardStatus: () => ipcRenderer.invoke('get-guard-status'),
-  getProcesses: () => ipcRenderer.invoke('get-processes'),
+  // 登录窗口：绑定房间
+  bindSubmit: (serverUrl, joinCode, studentId, name) =>
+    ipcRenderer.invoke('bind:submit', { serverUrl, joinCode, studentId, name }),
 
-  // 数据保存
-  saveWhitelist: (data) => ipcRenderer.invoke('save-whitelist', data),
-  saveConfig: (data) => ipcRenderer.invoke('save-config', data),
+  // 悬浮窗：获取学生信息
+  getStudentInfo: () => ipcRenderer.invoke('student:getInfo'),
 
-  // 守卫控制
-  toggleGuard: () => ipcRenderer.invoke('toggle-guard'),
-  killProcess: (pid) => ipcRenderer.invoke('kill-process', pid),
-  clearViolations: () => ipcRenderer.invoke('clear-violations'),
+  //扫描当前进程 比对白名单
+  scanProcesses: () => ipcRenderer.invoke('process:scan'),
+  getWhitelist: () => ipcRenderer.invoke('whitelist:get'),
 
-  // 远程管控 API
-  getRemoteConfig: () => ipcRenderer.invoke('get-remote-config'),
-  saveRemoteConfig: (data) => ipcRenderer.invoke('save-remote-config', data),
-  bindStudent: (code) => ipcRenderer.invoke('bind-student', code),
+  // 悬浮窗：上报违规列表（定期心跳）
+  reportViolations: (violations) =>
+    ipcRenderer.invoke('violations:report', violations),
 
-  // 事件监听
-  onGuardStatus: (cb) => ipcRenderer.on('guard-status', (_, v) => cb(v)),
-  onViolationsUpdate: (cb) => ipcRenderer.on('violations-update', (_, v) => cb(v)),
-  onProcessesUpdate: (cb) => ipcRenderer.on('processes-update', (_, v) => cb(v)),
-  onRemoteStatus: (cb) => ipcRenderer.on('remote-status', (_, v) => cb(v)),
-  onServerMessage: (cb) => ipcRenderer.on('server-message', (_, v) => cb(v)),
-  onWhitelistUpdated: (cb) => ipcRenderer.on('whitelist-updated', (_, v) => cb(v)),
+  // 悬浮窗：登出
+  logout: () => ipcRenderer.invoke('student:logout'),
 
-  // 移除监听
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
+  // 通用事件监听
+  on: (channel, callback) => {
+    ipcRenderer.on(channel, (_, ...args) => {
+      callback(...args);
+    });
+  },
+
+  // 移除所有监听
+  removeListener: (channel) => ipcRenderer.removeAllListeners(channel),
 });
+

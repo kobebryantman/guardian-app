@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guardian - 绑定房间</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 400px;
+      height: 440px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .login-container {
+      width: 100%;
+      height: 100%;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .header h1 {
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      color: #a0a0a0;
+      font-size: 12px;
+    }
+
+    .form {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-group label {
+      color: #e0e0e0;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .form-group input {
+      padding: 8px 10px;
+      border: 1px solid #404070;
+      border-radius: 4px;
+      background: #16213e;
+      color: #e0e0e0;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: #00d4ff;
+      box-shadow: 0 0 4px rgba(0, 212, 255, 0.3);
+    }
+
+    .form-group input::placeholder {
+      color: #707090;
+    }
+
+    .status {
+      height: 20px;
+      font-size: 12px;
+      color: #ffaa44;
+      text-align: center;
+      margin: 0;
+    }
+
+    .status.error {
+      color: #ff6b6b;
+    }
+
+    .status.success {
+      color: #51cf66;
+    }
+
+    .status.connecting {
+      color: #ffd93d;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #00d4ff;
+      color: #0f3460;
+    }
+
+    button:hover {
+      background: #00e6ff;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      background: #404070;
+      color: #a0a0a0;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      color: #707090;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-container">
+    <div class="header">
+      <h1>📱 Guardian</h1>
+      <p>输入信息后点击连接</p>
+    </div>
+
+    <form class="form" id="loginForm">
+      <div class="form-group">
+        <label for="serverUrl">服务器地址</label>
+        <input type="text" id="serverUrl" placeholder="ws://192.168.1.100:3847" value="ws://localhost:3847" />
+      </div>
+
+      <div class="form-group">
+        <label for="joinCode">接入码</label>
+        <input type="text" id="joinCode" placeholder="6位接入码" maxlength="6" />
+      </div>
+
+      <div class="form-group">
+        <label for="studentId">学号</label>
+        <input type="text" id="studentId" placeholder="可选，默认为计算机名" />
+      </div>
+
+      <div class="form-group">
+        <label for="name">姓名</label>
+        <input type="text" id="name" placeholder="可选" />
+      </div>
+
+      <div class="status" id="status"></div>
+
+      <div class="button-group">
+        <button type="submit" id="connectBtn">连接</button>
+      </div>
+    </form>
+
+    <div class="footer">
+      <p>绑定成功后悬浮窗将显示监控状态</p>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const statusEl = document.getElementById('status');
+    const connectBtn = document.getElementById('connectBtn');
+    const serverUrlInput = document.getElementById('serverUrl');
+    const joinCodeInput = document.getElementById('joinCode');
+    const studentIdInput = document.getElementById('studentId');
+    const nameInput = document.getElementById('name');
+
+    // 监听 IPC 事件
+    window.guardian.on('ws:connected', () => {
+      setStatus('已连接服务器，等待绑定结果...', 'connecting');
+    });
+
+    window.guardian.on('ws:disconnected', () => {
+      setStatus('连接已断开', 'error');
+      connectBtn.disabled = false;
+      connectBtn.textContent = '重新连接';
+    });
+
+    window.guardian.on('bind:error', (msg) => {
+      setStatus('绑定失败: ' + msg, 'error');
+      connectBtn.disabled = false;
+      connectBtn.textContent = '重新连接';
+    });
+
+    function setStatus(text, type = '') {
+      statusEl.textContent = text;
+      statusEl.className = 'status ' + type;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const serverUrl = serverUrlInput.value.trim();
+      const joinCode = joinCodeInput.value.trim();
+      const studentId = studentIdInput.value.trim();
+      const name = nameInput.value.trim();
+
+      if (!serverUrl) {
+        setStatus('请输入服务器地址', 'error');
+        return;
+      }
+
+      if (!joinCode) {
+        setStatus('请输入接入码', 'error');
+        return;
+      }
+
+      connectBtn.disabled = true;
+      connectBtn.textContent = '连接中...';
+      setStatus('正在连接...', 'connecting');
+
+      try {
+        const result = await window.guardian.bindSubmit(
+          serverUrl,
+          joinCode,
+          studentId,
+          name
+        );
+
+        if (result.ok) {
+          setStatus('连接成功，等待服务器确认...', 'connecting');
+        } else {
+          setStatus('连接失败: ' + (result.msg || '未知错误'), 'error');
+          connectBtn.disabled = false;
+          connectBtn.textContent = '重新连接';
+        }
+      } catch (err) {
+        setStatus('错误: ' + err.message, 'error');
+        connectBtn.disabled = false;
+        connectBtn.textContent = '重新连接';
+      }
+    });
+
+    // 初始状态
+    setStatus('已就绪，请输入信息', '');
+  </script>
+</body>
+
+</html>
